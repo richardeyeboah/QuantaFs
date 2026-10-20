@@ -41,7 +41,7 @@ import org.rocksdb.WriteOptions;
  * acknowledged writes after a damaged record.
  *
  * <p><b>Limits:</b> durability assumes the OS and device honor fsync (on macOS fsync does not flush
- * the drive cache). No compaction or snapshots: the log only grows.
+ * the drive cache). Snapshot images and covered-prefix removal are atomically synced; RocksDB reclaims obsolete physical records in the background.
  */
 public final class RocksDbRaftStorage implements RaftStorage, AutoCloseable {
 
@@ -58,6 +58,11 @@ public final class RocksDbRaftStorage implements RaftStorage, AutoCloseable {
     private final RocksDB db;
     private TermAndVote termAndVote; // guarded by this
     private final List<Long> terms = new ArrayList<>(); // terms.get(i) is the term of index i + 1
+    private io.github.richardeyeboah.quantafs.raft.Snapshot snapshot;
+    private long base() { return snapshot==null?0:snapshot.position().index(); }
+    @Override public synchronized java.util.Optional<io.github.richardeyeboah.quantafs.raft.Snapshot> snapshot() {
+        ensureUsable();return java.util.Optional.ofNullable(snapshot);
+    }
     private boolean failed;
     private boolean closed;
 
@@ -108,13 +113,17 @@ public final class RocksDbRaftStorage implements RaftStorage, AutoCloseable {
     private void load() {
         TermAndVote stored = null;
         try (RocksIterator it = db.newIterator()) {
+            byte[] saved=db.get(new byte[]{3});
+            snapshot=saved==null?null:RecordCodec.decodeSnapshot(saved);
             for (it.seekToFirst(); it.isValid(); it.next()) {
                 byte[] key = it.key();
                 if (key.length == 1 && key[0] == TERM_AND_VOTE_KEY[0]) {
                     stored = RecordCodec.decodeTermAndVote(it.value());
+                } else if(key.length==1 && key[0]==3) {
+                    // Already decoded before scanning the retained suffix.
                 } else if (key.length == 9 && key[0] == LOG_PREFIX) {
                     long index = ByteBuffer.wrap(key, 1, 8).getLong();
-                    long expected = terms.size() + 1;
+                    long expected = base()+terms.size() + 1;
                     if (index != expected) {
                         throw corrupt("log has a gap: expected index " + expected + ", found " + index);
                     }
@@ -137,11 +146,13 @@ public final class RocksDbRaftStorage implements RaftStorage, AutoCloseable {
             throw new PersistenceException("cannot read Raft storage at " + directory + ": " + e.getMessage(), e);
         }
         if (stored == null) {
-            if (!terms.isEmpty()) {
+            if (!terms.isEmpty() || snapshot!=null) {
                 throw corrupt("log entries exist without term/vote metadata");
             }
             stored = TermAndVote.INITIAL;
         }
+        if (snapshot!=null && snapshot.position().term()>stored.currentTerm()) throw corrupt("snapshot from future term");
+        if (!terms.isEmpty() && (terms.getFirst()<(snapshot==null?0:snapshot.position().term()))) throw corrupt("suffix precedes snapshot term");
         if (!terms.isEmpty() && terms.getLast() > stored.currentTerm()) {
             throw corrupt("last entry term " + terms.getLast() + " exceeds stored term " + stored.currentTerm());
         }
@@ -161,21 +172,23 @@ public final class RocksDbRaftStorage implements RaftStorage, AutoCloseable {
     @Override
     public synchronized long lastIndex() {
         ensureUsable();
-        return terms.size();
+        return base()+terms.size();
     }
 
     @Override
     public synchronized long termAt(long index) {
         ensureUsable();
-        RaftStorage.checkIndex(index, terms.size());
-        return index == 0 ? 0 : terms.get((int) index - 1);
+        RaftStorage.checkIndex(index, lastIndex());
+        if(snapshot!=null && index==base()) return snapshot.position().term();
+        if(index<base()) throw new IllegalArgumentException("compacted index");
+        return index == 0 ? 0 : terms.get((int)(index-base()) - 1);
     }
 
     @Override
     public synchronized LogEntry entry(long index) {
         ensureUsable();
-        if (index < 1 || index > terms.size()) {
-            throw new IllegalArgumentException("no entry at index " + index + "; log ends at " + terms.size());
+        if (index <= base() || index > lastIndex()) {
+            throw new IllegalArgumentException("no entry at index " + index + "; log ends at " + lastIndex());
         }
         try {
             byte[] value = db.get(logKey(index));
@@ -183,7 +196,7 @@ public final class RocksDbRaftStorage implements RaftStorage, AutoCloseable {
                 throw corrupt("entry " + index + " disappeared");
             }
             LogEntry entry = RecordCodec.decodeEntry(value);
-            if (entry.index() != index || entry.term() != terms.get((int) index - 1)) {
+            if (entry.index() != index || entry.term() != terms.get((int)(index-base()) - 1)) {
                 throw corrupt("entry " + index + " does not match the log loaded at startup");
             }
             return entry;
@@ -210,7 +223,8 @@ public final class RocksDbRaftStorage implements RaftStorage, AutoCloseable {
         Objects.requireNonNull(write, "write");
         ensureUsable();
         try {
-            write.validate(termAndVote, terms.size(), this::termAt);
+            if(write.truncateFrom()>0 && write.truncateFrom()<=base()) throw new IllegalArgumentException("truncate compacted prefix");
+            write.validate(termAndVote, lastIndex(), this::termAt);
         } catch (IllegalArgumentException e) {
             throw new PersistenceException("rejected unsafe write: " + e.getMessage(), e);
         }
@@ -219,7 +233,7 @@ public final class RocksDbRaftStorage implements RaftStorage, AutoCloseable {
                 batch.put(TERM_AND_VOTE_KEY, RecordCodec.encodeTermAndVote(write.termAndVote().get()));
             }
             if (write.truncateFrom() > 0) {
-                for (long i = write.truncateFrom(); i <= terms.size(); i++) {
+                for (long i = write.truncateFrom(); i <= lastIndex(); i++) {
                     batch.delete(logKey(i));
                 }
             }
@@ -233,9 +247,24 @@ public final class RocksDbRaftStorage implements RaftStorage, AutoCloseable {
         }
         write.termAndVote().ifPresent(next -> termAndVote = next);
         if (write.truncateFrom() > 0) {
-            terms.subList((int) write.truncateFrom() - 1, terms.size()).clear();
+            terms.subList((int)(write.truncateFrom()-base()) - 1, terms.size()).clear();
         }
         write.append().forEach(entry -> terms.add(entry.term()));
+    }
+
+    @Override public synchronized void installSnapshot(io.github.richardeyeboah.quantafs.raft.Snapshot next) {
+        ensureUsable();io.github.richardeyeboah.quantafs.raft.StateImage.decode(next);
+        long index=next.position().index();
+        if(index<base() || next.position().term()>termAndVote.currentTerm()) throw new PersistenceException("invalid snapshot boundary");
+        boolean keep=index<=lastIndex() && termAt(index)==next.position().term();
+        long removeThrough=keep?index:lastIndex();
+        try(var batch=new WriteBatch()) {
+            batch.put(new byte[]{3},RecordCodec.encodeSnapshot(next));
+            for(long i=base()+1;i<=removeThrough;i++) batch.delete(logKey(i));
+            db.write(syncWrites,batch);
+        } catch(RocksDBException e) {failed=true;throw new PersistenceException("snapshot persistence failed",e);}
+        if(keep) terms.subList(0,(int)(index-base())).clear();else terms.clear();
+        snapshot=next;
     }
 
     @Override

@@ -34,8 +34,8 @@ import java.util.function.Supplier;
  * {@code commitIndex} starts equal to it: applied entries are known to be committed, while a log
  * entry's mere presence proves nothing. The rest is relearned from the leader.
  *
- * <p>Rule references are to the Raft paper (Ongaro and Ousterhout, 2014), mainly Figure 2. Not
- * implemented: snapshots, membership changes, PreVote, leader leases or read index. Not thread-safe.
+ * <p>Rule references are to the Raft paper (Ongaro and Ousterhout, 2014), mainly Figure 2. Snapshot installation and compaction preserve the committed prefix and retry sessions. Not
+ * implemented: membership changes, PreVote, leader leases or read index. Not thread-safe.
  */
 public final class RaftNode {
 
@@ -100,6 +100,8 @@ public final class RaftNode {
             throw new PersistenceException("refusing to start: last log term " + last.term()
                     + " exceeds persisted term " + durable.currentTerm());
         }
+        if(storage.snapshot().isPresent() && stateMachine.lastApplied().index()<storage.firstRetainedIndex()-1)
+            stateMachine.restore(storage.snapshot().orElseThrow());
         LogPosition applied = stateMachine.lastApplied();
         if (applied.index() > last.index()) {
             throw new PersistenceException("refusing to start: state machine applied index " + applied.index()
@@ -219,6 +221,8 @@ public final class RaftNode {
             case RequestVoteResponse response -> onRequestVoteResponse(response);
             case AppendEntriesRequest request -> onAppendEntries(request);
             case AppendEntriesResponse response -> onAppendEntriesResponse(response);
+            case InstallSnapshotRequest request -> onInstallSnapshot(request);
+            case InstallSnapshotResponse response -> onSnapshotResponse(response);
         };
     }
 
@@ -352,7 +356,7 @@ public final class RaftNode {
 
         // Receiver rule 2: the log must contain an entry at prevLogIndex whose term is prevLogTerm.
         long lastIndex = storage.lastIndex();
-        boolean consistent = request.prevLogIndex() <= lastIndex
+        boolean consistent = request.prevLogIndex() >= storage.firstRetainedIndex()-1 && request.prevLogIndex() <= lastIndex
                 && storage.termAt(request.prevLogIndex()) == request.prevLogTerm();
 
         // Rules 3 and 4: skip entries already present with the same term; at the first index whose
@@ -421,7 +425,8 @@ public final class RaftNode {
 
     private AppendEntriesResponse failure(AppendEntriesRequest request) {
         return new AppendEntriesResponse(
-                id, request.from(), currentTerm, request.term(), false, request.prevLogIndex(), 0, storage.lastIndex());
+                id, request.from(), currentTerm, request.term(), false, request.prevLogIndex(), 0, storage.lastIndex(),snapshotIndex(),
+                storage.snapshot().map(image -> image.position().term()).orElse(0L));
     }
 
     // ================================================================ replication (2B), leader side
@@ -461,7 +466,16 @@ public final class RaftNode {
         if (response.requestPrevLogIndex() != next - 1) {
             return List.of();
         }
+        // The follower may have compacted a committed prefix farther than this leader's local
+        // compaction boundary. Verify the hinted boundary against our own log before advancing.
+        long boundary=response.followerSnapshotIndex();
+        if(boundary>=next && boundary>=storage.firstRetainedIndex()-1 && boundary<=storage.lastIndex()
+                && storage.termAt(boundary)==response.followerSnapshotTerm()) {
+            matchIndex.put(follower,Math.max(match,boundary));nextIndex.put(follower,boundary+1);
+            advanceLeaderCommit();return List.of(appendEntriesTo(follower));
+        }
         long retry = Math.max(match + 1, Math.min(response.requestPrevLogIndex(), response.followerLastIndex() + 1));
+        if(retry==next) return List.of(); // wait for the next heartbeat rather than spin on an impossible prefix
         nextIndex.put(follower, retry);
         return List.of(appendEntriesTo(follower));
     }
@@ -490,12 +504,53 @@ public final class RaftNode {
         return peers.stream().<RaftMessage>map(this::appendEntriesTo).toList();
     }
 
-    private AppendEntriesRequest appendEntriesTo(NodeId peer) {
+    private RaftMessage appendEntriesTo(NodeId peer) {
         long next = nextIndex.get(peer);
+        if(next<storage.firstRetainedIndex())
+            return new InstallSnapshotRequest(id,peer,currentTerm,storage.snapshot().orElseThrow());
         long prev = next - 1;
         long last = storage.lastIndex();
         List<LogEntry> entries = storage.entries(next, Math.min(last, next + MAX_ENTRIES_PER_APPEND - 1));
         return new AppendEntriesRequest(id, peer, currentTerm, prev, storage.termAt(prev), entries, commitIndex);
+    }
+
+    /** Compact only state that this node has already committed and applied. Oversized images retain the log. */
+    public boolean compact() {
+        if(isHalted() || lastApplied==0 || lastApplied<storage.firstRetainedIndex()) return true;
+        try {
+            Snapshot image=stateMachine.snapshot();
+            if(image.position().index()!=lastApplied || image.position().term()!=storage.termAt(lastApplied)) throw new StateMachineException("snapshot application boundary changed");
+            storage.installSnapshot(image);
+            return true;
+        } catch(IllegalArgumentException tooLarge) {return false;}
+        catch(PersistenceException|StateMachineException failure) {halt(failure);return false;}
+    }
+    public long snapshotIndex() {return storage.firstRetainedIndex()-1;}
+    public long retainedEntries() {return storage.lastIndex()-snapshotIndex();}
+
+    private List<RaftMessage> onInstallSnapshot(InstallSnapshotRequest request) {
+        if(request.term()<currentTerm) return List.of(new InstallSnapshotResponse(id,request.from(),currentTerm,
+                request.snapshot().position().index(),false));
+        if(request.term()>currentTerm) {persist(new TermAndVote(request.term(),Optional.empty()));stepDownAfterTermChange();}
+        if(role==Role.LEADER) throw new IllegalStateException("two leaders in same term");
+        role=Role.FOLLOWER;leaderId=request.from();resetElectionTimer();
+        Snapshot image=request.snapshot();
+        StateImage.decode(image);
+        if(image.position().index()>commitIndex) {
+            // Log image first. Startup repairs the application if a crash interrupts the second step.
+            storage.installSnapshot(image);
+            stateMachine.restore(image);
+            commitIndex=image.position().index();lastApplied=commitIndex;
+        }
+        return List.of(new InstallSnapshotResponse(id,request.from(),currentTerm,image.position().index(),true));
+    }
+    private List<RaftMessage> onSnapshotResponse(InstallSnapshotResponse response) {
+        if(response.term()>currentTerm) return adoptHigherTerm(response.term());
+        if(role!=Role.LEADER || response.term()!=currentTerm || !response.success()) return List.of();
+        if(response.snapshotIndex()>storage.lastIndex()) throw new IllegalStateException("snapshot acknowledgement beyond leader log");
+        long matched=Math.max(matchIndex.get(response.from()),response.snapshotIndex());
+        matchIndex.put(response.from(),matched);nextIndex.put(response.from(),Math.max(nextIndex.get(response.from()),matched+1));
+        advanceLeaderCommit();return List.of(appendEntriesTo(response.from()));
     }
 
     // ================================================================ application

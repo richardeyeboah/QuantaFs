@@ -16,12 +16,13 @@ public final class Main {
 
     private static final String USAGE =
             """
-            Usage: java -jar quantafs.jar <server|client|cluster-server|cluster-status|election-demo|replication-demo> [options]
+            Usage: java -jar quantafs.jar <server|client|cluster-server|cluster-status|cluster-client|election-demo|replication-demo> [options]
 
               server            single-node durable key-value server (milestone 1)
               client            command-line client for the server
               cluster-server    real local Raft node (3 or 5 fixed voters)
               cluster-status    inspect a local cluster node's role and progress
+              cluster-client    automatic leader discovery with a durable retry journal
               election-demo     deterministic simulation of Raft leader election (milestone 2A)
               replication-demo  deterministic simulation of Raft log replication with per-node
                                 RocksDB storage in a temporary directory (milestone 2B)
@@ -56,6 +57,7 @@ public final class Main {
                     System.exit(code);
                 }
             }
+            case "cluster-client" -> System.exit(io.github.richardeyeboah.quantafs.cluster.RetryCli.run(rest));
             case "cluster-server" -> runCluster(rest);
             case "cluster-status" -> System.exit(io.github.richardeyeboah.quantafs.cluster.ClusterCommands.status(rest));
             case "client" -> System.exit(QuantaCli.run(rest, System.out, System.err));

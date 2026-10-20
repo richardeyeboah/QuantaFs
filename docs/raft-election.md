@@ -1,5 +1,9 @@
 # Milestone 2A: deterministic Raft leader election
 
+This is a historical milestone checkpoint. The current automatic retry client and snapshot/log
+cleanup implementation are documented in [milestones 4–5](retries-and-snapshots.md).
+
+
 Milestone 2A implements the **leader-election half of Raft** as a deterministic, testable core,
 plus a simulator that drives several copies of it through crashes, partitions, and message faults.
 It is the first part of milestone 2, not a complete Raft implementation.

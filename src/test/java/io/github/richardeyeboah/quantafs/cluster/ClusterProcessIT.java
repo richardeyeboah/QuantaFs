@@ -40,6 +40,7 @@ class ClusterProcessIT {
             processes.add(launch(i));
             channels.add(ManagedChannelBuilder.forAddress("127.0.0.1",ports.get(i)).usePlaintext().build());
         }
+        try(var retryClient=new ClusterClient(ports,Duration.ofSeconds(20))) {
         int leader=awaitLeader(-1);
         ByteString key=ByteString.copyFrom(new byte[]{0,(byte)255,42});
         ByteString value=ByteString.copyFrom(new byte[]{0,10,(byte)254});
@@ -55,9 +56,27 @@ class ClusterProcessIT {
         assertEquals(Status.Code.FAILED_PRECONDITION,assertThrows(StatusRuntimeException.class,() ->
                 RaftTransportGrpc.newBlockingStub(channels.get(follower)).withDeadlineAfter(2,TimeUnit.SECONDS)
                         .deliver(RaftEnvelope.newBuilder().setClusterKey("wrong").build())).getStatus().getCode());
+        var replay=PutRequest.newBuilder().setClientId("checkout").setSequence(1)
+                .setKey(ByteString.copyFromUtf8("retry-key")).setValue(ByteString.copyFromUtf8("old")).build();
+        retryClient.put(replay);
+        kv(leader).put(PutRequest.newBuilder().setKey(replay.getKey()).setValue(ByteString.copyFromUtf8("newer")).build());
+        retryClient.put(replay); // deliberately ignore first acknowledgement and repeat the same identity
+        assertEquals("newer",retryClient.get(GetRequest.newBuilder().setKey(replay.getKey()).build()).getValue().toStringUtf8());
+        assertEquals(Status.Code.ALREADY_EXISTS,assertThrows(StatusRuntimeException.class,() ->
+                retryClient.put(replay.toBuilder().setValue(ByteString.copyFromUtf8("conflict")).build())).getStatus().getCode());
+        processes.get(follower).destroyForcibly();assertTrue(processes.get(follower).waitFor(10,TimeUnit.SECONDS));
+        for(int sequence=1;sequence<=130;sequence++) retryClient.put(PutRequest.newBuilder()
+                .setClientId("batch").setSequence(sequence).setKey(ByteString.copyFromUtf8("workload"))
+                .setValue(ByteString.copyFromUtf8("value"+sequence)).build());
+        assertTrue(status(leader).getSnapshotIndex()>0,"leader should compact committed log history");
+        processes.set(follower,launch(follower));
+        long catchupTarget=status(leader).getAppliedIndex();
+        await(() -> {var state=tryStatus(follower);return state!=null && state.getSnapshotIndex()>0
+                && state.getAppliedIndex()>=catchupTarget && !state.getHalted();},"offline follower installs snapshot and catches up");
         processes.get(leader).destroyForcibly();
         assertTrue(processes.get(leader).waitFor(10,TimeUnit.SECONDS));
         int replacement=awaitLeader(leader);
+        assertEquals(value,retryClient.get(GetRequest.newBuilder().setKey(key).build()).getValue());
         assertEquals(value,kv(replacement).get(GetRequest.newBuilder().setKey(key).build()).getValue());
         ByteString emptyKey=ByteString.copyFromUtf8("empty");
         kv(replacement).put(PutRequest.newBuilder().setKey(emptyKey).build());
@@ -75,10 +94,14 @@ class ClusterProcessIT {
         }
         var readFailure=assertThrows(StatusRuntimeException.class,() -> kv(replacement)
                 .get(GetRequest.newBuilder().setKey(key).build()));
-        assertEquals(Status.Code.DEADLINE_EXCEEDED,readFailure.getStatus().getCode());
+        // A delayed higher-term message can make the survivor step down as the majority dies.
+        // Both timeout and not-leader are safe; a successful stale read or halted node is not.
+        assertTrue(Set.of(Status.Code.DEADLINE_EXCEEDED,Status.Code.UNAVAILABLE).contains(readFailure.getStatus().getCode()));
+        assertFalse(status(replacement).getHalted());
         var writeFailure=assertThrows(StatusRuntimeException.class,() -> kv(replacement)
                 .put(PutRequest.newBuilder().setKey(ByteString.copyFromUtf8("ambiguous")).setValue(value).build()));
-        assertEquals(Status.Code.DEADLINE_EXCEEDED,writeFailure.getStatus().getCode());
+        assertTrue(Set.of(Status.Code.DEADLINE_EXCEEDED,Status.Code.UNAVAILABLE).contains(writeFailure.getStatus().getCode()));
+        assertFalse(status(replacement).getHalted());
         for(int i=0;i<count;i++) if(i!=replacement) processes.set(i,launch(i));
         await(() -> {
             for(int i=0;i<count;i++) {
@@ -96,10 +119,14 @@ class ClusterProcessIT {
         for(int i=0;i<count;i++) processes.set(i,launch(i));
         int reopened=awaitLeader(-1);
         assertEquals(value,kv(reopened).get(GetRequest.newBuilder().setKey(key).build()).getValue());
+        retryClient.put(replay);
+        assertEquals("newer",retryClient.get(GetRequest.newBuilder().setKey(replay.getKey()).build()).getValue().toStringUtf8());
+        assertEquals("value130",retryClient.get(GetRequest.newBuilder().setKey(ByteString.copyFromUtf8("workload")).build()).getValue().toStringUtf8());
         Process duplicate=launch(reopened);
         try { assertTrue(duplicate.waitFor(10,TimeUnit.SECONDS)); assertNotEquals(0,duplicate.exitValue()); }
         finally { duplicate.destroyForcibly(); }
-        System.out.printf("Real %d-process cluster: confirmed binary data survived leader kill and full restart; quorum-less reads/writes refused%n",count);
+        System.out.printf("Real %d-process cluster: confirmed binary data survived leader kill and full restart; quorum-less reads/writes refused; retry deduplication and snapshot catch-up verified%n",count);
+        }
     }
     private Process launch(int i) throws Exception {
         String java=Path.of(System.getProperty("java.home"),"bin","java").toString();

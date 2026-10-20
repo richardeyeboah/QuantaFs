@@ -14,7 +14,10 @@ class WireCodecTest {
                         new LogEntry(2,3,Command.put(new byte[]{0,(byte)255},new byte[]{10,0})),
                         new LogEntry(3,3,Command.delete(new byte[]{0,(byte)255}))),2),
                 new AppendEntriesResponse(b,a,3,3,true,0,3,3),
-                new AppendEntriesResponse(b,a,4,3,false,4,0,1));
+                new AppendEntriesResponse(b,a,4,3,false,4,0,1),
+                new AppendEntriesResponse(b,a,3,3,false,0,0,10,7,2),
+                new InstallSnapshotRequest(a,b,3,new StateImage(new LogPosition(2,7),new TreeMap<>(),new TreeMap<>()).snapshot()),
+                new InstallSnapshotResponse(b,a,3,7,true));
         for(var m:messages) assertEquals(m,WireCodec.decode(WireCodec.encode("test",m)));
     }
     @Test void invalidWireDataIsRejected() {

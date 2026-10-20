@@ -30,3 +30,8 @@ secrets*
 .settings/
 .factorypath
 .DS_Store
+
+# Durable local retry-client journals
+*.session
+*.session.lock
+*.session.tmp

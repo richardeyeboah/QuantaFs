@@ -20,11 +20,21 @@ public record AppendEntriesResponse(
         boolean success,
         long requestPrevLogIndex,
         long matchIndex,
-        long followerLastIndex)
+        long followerLastIndex,
+        long followerSnapshotIndex,
+        long followerSnapshotTerm)
         implements RaftMessage {
+
+    public AppendEntriesResponse(NodeId from,NodeId to,long term,long requestTerm,boolean success,
+            long requestPrevLogIndex,long matchIndex,long followerLastIndex) {
+        this(from,to,term,requestTerm,success,requestPrevLogIndex,matchIndex,followerLastIndex,0,0);
+    }
 
     public AppendEntriesResponse {
         RaftMessage.validate(from, to, term);
+        if(followerSnapshotIndex<0 || followerSnapshotIndex>followerLastIndex || followerSnapshotTerm<0
+                || followerSnapshotTerm>term || (followerSnapshotIndex==0)!=(followerSnapshotTerm==0))
+            throw new IllegalArgumentException("invalid snapshot hint");
         if (requestTerm < 1 || requestTerm > term) {
             throw new IllegalArgumentException("requestTerm must be between 1 and the responder's term");
         }

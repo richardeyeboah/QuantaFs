@@ -18,17 +18,17 @@ import java.util.List;
  *       throws {@link PersistenceException} and changes nothing.
  *   <li><b>Fail closed:</b> I/O failures throw {@link PersistenceException}. After one, the caller
  *       must stop using the instance; on-disk state is unknown until it is reopened.
- *   <li>Log indexes are contiguous from 1. There is no compaction yet, so the first index is 1.
+ *   <li>Retained entries are contiguous from firstRetainedIndex(); a snapshot retains the preceding boundary term.
  * </ul>
  */
 public interface RaftStorage {
 
     TermAndVote termAndVote();
 
-    /** Index of the last entry, or 0 if the log is empty. */
+    /** Last logical index, including the snapshot boundary when the suffix is empty. */
     long lastIndex();
 
-    /** Term of the entry at {@code index}; 0 for index 0. */
+    /** Term at a retained entry or snapshot boundary; compacted earlier indexes are unavailable. */
     long termAt(long index);
 
     LogEntry entry(long index);
@@ -37,6 +37,11 @@ public interface RaftStorage {
     List<LogEntry> entries(long from, long to);
 
     void write(StorageWrite write);
+
+    default java.util.Optional<Snapshot> snapshot() { return java.util.Optional.empty(); }
+    default long firstRetainedIndex() { return snapshot().map(s -> s.position().index()+1).orElse(1L); }
+    default void installSnapshot(Snapshot snapshot) { throw new UnsupportedOperationException("snapshots unsupported"); }
+
 
     default LogPosition lastPosition() {
         long last = lastIndex();

@@ -17,6 +17,20 @@ public final class InMemoryRaftStorage implements RaftStorage {
     private final List<TermAndVote> termAndVoteHistory = new ArrayList<>();
     private FailureMode failureMode = FailureMode.NONE;
     private long writes;
+    private Snapshot snapshot;
+    private long base() { return snapshot==null?0:snapshot.position().index(); }
+    @Override public synchronized Optional<Snapshot> snapshot() { return Optional.ofNullable(snapshot); }
+    @Override public synchronized void installSnapshot(Snapshot next) {
+        if(failureMode==FailureMode.FAIL_BEFORE) throw new PersistenceException("injected snapshot failure before save");
+        StateImage.decode(next);
+        if(next.position().index()<base() || next.position().term()>termAndVote.currentTerm())
+            throw new PersistenceException("invalid snapshot boundary");
+        long index=next.position().index();
+        boolean keep=index<=lastIndex() && termAt(index)==next.position().term();
+        if(keep) log.subList(0,(int)(index-base())).clear();else log.clear();
+        snapshot=next;writes++;
+        if(failureMode==FailureMode.FAIL_AFTER) throw new PersistenceException("injected snapshot failure after save");
+    }
 
     public InMemoryRaftStorage() {
         this(TermAndVote.INITIAL, List.of());
@@ -37,21 +51,23 @@ public final class InMemoryRaftStorage implements RaftStorage {
 
     @Override
     public synchronized long lastIndex() {
-        return log.size();
+        return base()+log.size();
     }
 
     @Override
     public synchronized long termAt(long index) {
-        RaftStorage.checkIndex(index, log.size());
-        return index == 0 ? 0 : log.get((int) index - 1).term();
+        RaftStorage.checkIndex(index, lastIndex());
+        if(index==base() && snapshot!=null) return snapshot.position().term();
+        if(index<base()) throw new IllegalArgumentException("compacted index");
+        return index == 0 ? 0 : log.get((int)(index-base()) - 1).term();
     }
 
     @Override
     public synchronized LogEntry entry(long index) {
-        if (index < 1 || index > log.size()) {
-            throw new IllegalArgumentException("no entry at index " + index + "; log ends at " + log.size());
+        if (index <= base() || index > lastIndex()) {
+            throw new IllegalArgumentException("no entry at index " + index + "; log ends at " + lastIndex());
         }
-        return log.get((int) index - 1);
+        return log.get((int)(index-base()) - 1);
     }
 
     @Override
@@ -59,9 +75,10 @@ public final class InMemoryRaftStorage implements RaftStorage {
         if (from > to) {
             return List.of();
         }
-        RaftStorage.checkIndex(from - 1, log.size());
-        RaftStorage.checkIndex(to, log.size());
-        return List.copyOf(log.subList((int) from - 1, (int) to));
+        if(from<=base()) throw new IllegalArgumentException("compacted prefix");
+        RaftStorage.checkIndex(from - 1, lastIndex());
+        RaftStorage.checkIndex(to, lastIndex());
+        return List.copyOf(log.subList((int)(from-base()) - 1, (int)(to-base())));
     }
 
     @Override
@@ -71,7 +88,8 @@ public final class InMemoryRaftStorage implements RaftStorage {
             throw new PersistenceException("injected storage failure before write");
         }
         try {
-            write.validate(termAndVote, log.size(), this::termAt);
+            if(write.truncateFrom()>0 && write.truncateFrom()<=base()) throw new IllegalArgumentException("truncate compacted prefix");
+            write.validate(termAndVote, lastIndex(), this::termAt);
         } catch (IllegalArgumentException e) {
             throw new PersistenceException("rejected unsafe write: " + e.getMessage(), e);
         }
@@ -82,7 +100,7 @@ public final class InMemoryRaftStorage implements RaftStorage {
             termAndVote = next;
         });
         if (write.truncateFrom() > 0) {
-            log.subList((int) write.truncateFrom() - 1, log.size()).clear();
+            log.subList((int)(write.truncateFrom()-base()) - 1, log.size()).clear();
         }
         log.addAll(write.append());
         writes++;

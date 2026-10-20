@@ -12,8 +12,9 @@ package io.github.richardeyeboah.quantafs.raft;
  *       <em>not</em> known to have failed.
  * </ul>
  *
- * <p>There is no deduplication: a client that retries after {@code UNKNOWN} may cause the command
- * to be applied twice. Request IDs are a later milestone.
+ * <p>Plain commands have no deduplication. A retry-safe client uses Command.Request with a stable
+ * client ID and sequence; the state machine then suppresses repeated effects. UNKNOWN is never
+ * permission to retry a plain command blindly.
  */
 public record ProposalOutcome(long index, long term, Status status) {
 

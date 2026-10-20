@@ -35,6 +35,9 @@ service KeyValueService {
 message PutRequest {
   bytes key = 1;
   bytes value = 2;
+  // Optional cluster-mode sequential retry session. Both fields must be provided together.
+  string client_id = 3;
+  int64 sequence = 4;
 }
 
 message PutResponse {}
@@ -53,6 +56,9 @@ message GetResponse {
 
 message DeleteRequest {
   bytes key = 1;
+  // Optional cluster-mode sequential retry session; unsupported by single-node mode.
+  string client_id = 2;
+  int64 sequence = 3;
 }
 
 message DeleteResponse {}

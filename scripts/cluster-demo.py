@@ -10,6 +10,7 @@ import time
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--nodes', type=int, choices=(3, 5), default=3)
+parser.add_argument('--advanced', action='store_true', help='exercise automatic retry client and snapshot catch-up')
 parser.add_argument('--keep', action='store_true', help='keep this run\'s temporary node databases and logs')
 args = parser.parse_args()
 project = pathlib.Path(__file__).resolve().parents[1]
@@ -62,21 +63,38 @@ def client(i, *command):
         raise RuntimeError('Client request failed; no automatic mutation retries are performed.')
     return result.stdout.strip()
 
+def retry(*command, quiet=False):
+    seeds = ','.join(f'127.0.0.1:{p}' for p in ports)
+    result = subprocess.run([java, '-jar', str(jar), 'cluster-client', '--seeds', seeds,
+        '--session', str(work / 'checkout.session'), *command], capture_output=True, text=True, timeout=25)
+    if not quiet:
+        print(f'  automatic client: {" ".join(command)} -> {(result.stdout + result.stderr).strip()}', flush=True)
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip())
+    return result.stdout.strip()
+
 try:
     print(f'Starting {args.nodes} independent Java processes. Storage/logs: {work}', flush=True)
     for i in range(args.nodes):
         start(i)
     first = leader()
     print(f'1. n{first+1} elected leader.', flush=True)
-    client(first, 'put', 'order:1042', 'paid')
-    assert client(first, 'get', 'order:1042') == 'paid'
+    if args.advanced:
+        retry('put', 'order:1042', 'paid')
+    else:
+        client(first, 'put', 'order:1042', 'paid')
+    assert (retry('get', 'order:1042') if args.advanced else client(first, 'get', 'order:1042')) == 'paid'
     print(f'2. Forcibly killing leader n{first+1}; no shutdown cleanup runs.', flush=True)
     processes[first].kill()
     processes[first].wait(timeout=10)
     replacement = leader(first)
     print(f'3. n{replacement+1} is the replacement leader.', flush=True)
-    assert client(replacement, 'get', 'order:1042') == 'paid'
-    client(replacement, 'put', 'city', 'Accra')
+    if args.advanced:
+        assert retry('get', 'order:1042') == 'paid'
+        retry('put', 'city', 'Accra')
+    else:
+        assert client(replacement, 'get', 'order:1042') == 'paid'
+        client(replacement, 'put', 'city', 'Accra')
     print(f'4. Restarting n{first+1} using its original disk directory.', flush=True)
     start(first)
     target = int(status(replacement)['applied'])
@@ -88,6 +106,30 @@ try:
         time.sleep(.1)
     else:
         raise RuntimeError('Restarted node did not catch up.')
+    if args.advanced:
+        print(f'5. Taking follower n{first+1} offline while writes and read barriers trigger snapshots.', flush=True)
+        processes[first].kill()
+        processes[first].wait(timeout=10)
+        for n in range(40):
+            retry('put', 'demo:latest', f'value{n}', quiet=True)
+            assert retry('get', 'demo:latest', quiet=True) == f'value{n}'
+            if (n+1) % 10 == 0:
+                print(f'  {n+1}/40 journaled writes confirmed; read barriers verified.', flush=True)
+        current = leader(first)
+        before = status(current)
+        assert int(before['snapshot']) > 0
+        print(f"  Leader snapshot index={before['snapshot']}; retained log entries={before['retained']}", flush=True)
+        start(first)
+        end = time.monotonic() + 30
+        while time.monotonic() < end:
+            state = status(first)
+            if state and int(state['snapshot']) > 0 and int(state['applied']) >= int(before['applied']):
+                break
+            time.sleep(.1)
+        else:
+            raise RuntimeError('Lagging follower failed to install snapshot.')
+        assert retry('get', 'demo:latest') == 'value39'
+        print('  Snapshot restored the offline node and preserved the latest value.', flush=True)
     for i in range(args.nodes):
         print(f'  n{i+1}: {status(i)}', flush=True)
     print('PASS: confirmed order survived leader termination; restarted node caught up over real gRPC.', flush=True)

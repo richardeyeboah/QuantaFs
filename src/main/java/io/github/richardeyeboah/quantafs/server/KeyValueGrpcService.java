@@ -41,6 +41,8 @@ final class KeyValueGrpcService extends KeyValueServiceGrpc.KeyValueServiceImplB
                 responseObserver,
                 () -> {
                     RequestValidator.validateKey(request.getKey());
+                    if(!request.getClientId().isEmpty() || request.getSequence()!=0)
+                        throw Status.UNIMPLEMENTED.withDescription("retry sessions require cluster-server mode").asRuntimeException();
                     RequestValidator.validateValue(request.getValue());
                     store.put(request.getKey().toByteArray(), request.getValue().toByteArray());
                     return PutResponse.getDefaultInstance();
@@ -71,6 +73,8 @@ final class KeyValueGrpcService extends KeyValueServiceGrpc.KeyValueServiceImplB
                 "Delete",
                 responseObserver,
                 () -> {
+                    if(!request.getClientId().isEmpty() || request.getSequence()!=0)
+                        throw Status.UNIMPLEMENTED.withDescription("retry sessions require cluster-server mode").asRuntimeException();
                     RequestValidator.validateKey(request.getKey());
                     store.delete(request.getKey().toByteArray());
                     return DeleteResponse.getDefaultInstance();

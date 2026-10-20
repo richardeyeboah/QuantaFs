@@ -1,5 +1,8 @@
 # Milestone 3: real local processes over gRPC
 
+This documents the network foundation. For the newer automatic retry client, snapshots,
+log cleanup, and current limits, see [milestones 4–5](retries-and-snapshots.md).
+
 QuantaFs now runs three or five independent Java server processes, with a separate RocksDB
 consensus log and state machine per node. They communicate through TCP/gRPC on loopback.
 The public Put/Get/Delete API is connected to Raft in `cluster-server` mode.
@@ -119,7 +122,7 @@ histories and storage crash tests from milestone 2.
 Codec tests round-trip all four protocol message kinds and reject malformed commands. Identity
 tests cover same-process ownership, incompatible identities, and refusing unidentified databases.
 
-## Latest local validation
+## Milestone 3 local validation (historical checkpoint)
 
 On October 20, 2026, `./mvnw verify` passed 506 unit/in-process/simulation tests and six
 process-level integration tests: **512 total, zero failures, zero errors, zero skipped**.
@@ -134,7 +137,7 @@ Only loopback addresses are accepted: there is no TLS, authenticated peer identi
 control. The membership key prevents accidental configuration mixing; it is not an authentication
 secret. Do not expose these ports through forwarding or deploy this mode on an untrusted machine.
 
-No automatic client write retries/deduplication, log snapshots/compaction, live membership changes,
+At the original milestone-3 checkpoint there were no automatic client retries or snapshots; those
+are now implemented as described in `retries-and-snapshots.md`. Live membership changes,
 remote hosts, Kubernetes deployment, systematic real-network partition injection, disk/power-loss
-fault tests, or throughput/latency claims are included. The log and startup scans remain unbounded
-in lifetime; resource admission bounds do not make this a production-ready service.
+fault tests, or throughput/latency claims are included. Snapshot limits and resource admission bounds still require monitoring; this is not a production-ready service.

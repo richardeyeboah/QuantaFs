@@ -5,7 +5,7 @@ package io.github.richardeyeboah.quantafs.raft;
  * servers discover that they are out of date (paper, section 5.1).
  */
 public sealed interface RaftMessage
-        permits RequestVoteRequest, RequestVoteResponse, AppendEntriesRequest, AppendEntriesResponse {
+        permits RequestVoteRequest, RequestVoteResponse, AppendEntriesRequest, AppendEntriesResponse, InstallSnapshotRequest, InstallSnapshotResponse {
 
     NodeId from();
 

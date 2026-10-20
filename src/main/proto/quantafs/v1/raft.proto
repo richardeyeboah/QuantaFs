@@ -14,11 +14,12 @@ message NodeStatus {
  string id = 1; string role = 2; int64 term = 3; string leader = 4;
  int64 commit_index = 5; int64 applied_index = 6; bool halted = 7;
  int32 pending_requests = 8;
+ int64 snapshot_index = 9; int64 retained_entries = 10; bool snapshot_limited = 11; string cluster_key = 12;
 }
 message WireEntry {
  int64 index = 1; int64 term = 2;
  enum Kind { NO_OP = 0; PUT = 1; DELETE = 2; }
- Kind kind = 3; bytes key = 4; bytes value = 5;
+ Kind kind = 3; bytes key = 4; bytes value = 5; string client_id = 6; int64 sequence = 7;
 }
 message VoteCall { int64 last_term = 1; int64 last_index = 2; }
 message VoteReply { bool granted = 1; }
@@ -28,11 +29,15 @@ message AppendCall {
 message AppendReply {
  int64 request_term = 1; bool success = 2; int64 request_prev_index = 3;
  int64 match_index = 4; int64 last_index = 5;
+ int64 snapshot_index = 6; int64 snapshot_term = 7;
 }
+message SnapshotCall { int64 index = 1; int64 term = 2; bytes image = 3; }
+message SnapshotReply { int64 index = 1; bool success = 2; }
 message RaftEnvelope {
  string cluster_key = 1; string sender = 2; string receiver = 3; int64 term = 4;
  oneof payload {
   VoteCall vote_call = 5; VoteReply vote_reply = 6;
   AppendCall append_call = 7; AppendReply append_reply = 8;
+  SnapshotCall snapshot_call = 9; SnapshotReply snapshot_reply = 10;
  }
 }

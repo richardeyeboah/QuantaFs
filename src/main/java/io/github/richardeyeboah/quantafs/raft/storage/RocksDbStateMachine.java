@@ -1,6 +1,7 @@
 package io.github.richardeyeboah.quantafs.raft.storage;
 
 import io.github.richardeyeboah.quantafs.raft.Bytes;
+import io.github.richardeyeboah.quantafs.raft.ClientSession;
 import io.github.richardeyeboah.quantafs.raft.Command;
 import io.github.richardeyeboah.quantafs.raft.LogEntry;
 import io.github.richardeyeboah.quantafs.raft.LogPosition;
@@ -129,7 +130,16 @@ public final class RocksDbStateMachine implements StateMachine, AutoCloseable {
         ensureUsable();
         StateMachine.checkNext(lastApplied, entry);
         try (WriteBatch batch = new WriteBatch()) {
-            switch (entry.command()) {
+            Command effective=entry.command();
+            if(effective instanceof Command.Request request) {
+                if(ClientSession.isNext(session(request.clientId()),request)) {
+                    batch.put(meta,sessionKey(request.clientId()),
+                            new ClientSession(request.sequence(),ClientSession.fingerprint(request)).encode());
+                    effective=request.mutation();
+                } else effective=Command.noOp();
+            }
+            switch (effective) {
+                case Command.Request ignored -> throw new IllegalStateException("nested request");
                 case Command.Put put -> batch.put(data, put.key().toByteArray(), put.value().toByteArray());
                 case Command.Delete delete -> batch.delete(data, delete.key().toByteArray());
                 case Command.NoOp noOp -> { }
@@ -156,6 +166,43 @@ public final class RocksDbStateMachine implements StateMachine, AutoCloseable {
             throw new StateMachineException("cannot read state machine: " + e.getMessage(), e);
         }
         return Collections.unmodifiableSortedMap(contents);
+    }
+
+    @Override public synchronized io.github.richardeyeboah.quantafs.raft.Snapshot snapshot() {
+        ensureUsable();var sessions=new TreeMap<String,ClientSession>();
+        try(var it=db.newIterator(meta)) {
+            for(it.seekToFirst();it.isValid();it.next()) {
+                String key=new String(it.key(),StandardCharsets.UTF_8);
+                if(key.startsWith("session:")) sessions.put(key.substring(8),ClientSession.decode(it.value()));
+            }
+            it.status();
+        } catch(RocksDBException e) {throw new StateMachineException("cannot export sessions",e);}
+        return new io.github.richardeyeboah.quantafs.raft.StateImage(lastApplied,diagnosticContents(),sessions).snapshot();
+    }
+    @Override public synchronized void restore(io.github.richardeyeboah.quantafs.raft.Snapshot snapshot) {
+        ensureUsable();var image=io.github.richardeyeboah.quantafs.raft.StateImage.decode(snapshot);
+        if(image.position().index()<lastApplied.index()) throw new StateMachineException("snapshot goes backwards");
+        try(var batch=new WriteBatch();var dataIt=db.newIterator(data);var metaIt=db.newIterator(meta)) {
+            for(dataIt.seekToFirst();dataIt.isValid();dataIt.next()) batch.delete(data,dataIt.key());dataIt.status();
+            for(metaIt.seekToFirst();metaIt.isValid();metaIt.next()) batch.delete(meta,metaIt.key());metaIt.status();
+            for(var e:image.data().entrySet()) batch.put(data,e.getKey().toByteArray(),e.getValue().toByteArray());
+            for(var e:image.sessions().entrySet()) batch.put(meta,sessionKey(e.getKey()),e.getValue().encode());
+            batch.put(meta,LAST_APPLIED_KEY,RecordCodec.encodeApplied(image.position()));
+            db.write(syncWrites,batch);lastApplied=image.position();
+        } catch(RocksDBException e) {failed=true;throw new StateMachineException("snapshot application failed",e);}
+    }
+
+    private static byte[] sessionKey(String id) {
+        return ("session:"+id).getBytes(StandardCharsets.UTF_8);
+    }
+    private ClientSession session(String id) throws RocksDBException {
+        byte[] record=db.get(meta,sessionKey(id));
+        return record==null?null:ClientSession.decode(record);
+    }
+    public synchronized ClientSession.Result requestResult(Command.Request request) {
+        ensureUsable();
+        try { return ClientSession.result(session(request.clientId()),request); }
+        catch(RocksDBException e) { throw new StateMachineException("cannot read session",e); }
     }
 
     /** Local lookup only. Cluster clients must first complete a Raft read barrier. */

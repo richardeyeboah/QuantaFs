@@ -10,7 +10,7 @@ import java.util.Objects;
  * <p>Keys and values are arbitrary bytes, validated against the same limits as the single-node API
  * when a command is created. An invalid command therefore cannot be proposed or logged.
  */
-public sealed interface Command permits Command.Put, Command.Delete, Command.NoOp {
+public sealed interface Command permits Command.Put, Command.Delete, Command.NoOp, Command.Request {
 
     int MAX_KEY_BYTES = 1024;
     int MAX_VALUE_BYTES = 1024 * 1024;
@@ -65,6 +65,16 @@ public sealed interface Command permits Command.Put, Command.Delete, Command.NoO
         @Override
         public String toString() {
             return "NO_OP";
+        }
+    }
+
+    /** One sequential mutation session. The same identity must always carry the same payload. */
+    record Request(String clientId, long sequence, Command mutation) implements Command {
+        public Request {
+            if (clientId == null || !clientId.matches("[A-Za-z0-9_.-]{1,64}") || sequence < 1)
+                throw new IllegalArgumentException("client ID and positive sequence are required");
+            if (!(mutation instanceof Put) && !(mutation instanceof Delete))
+                throw new IllegalArgumentException("only put/delete can be session mutations");
         }
     }
 

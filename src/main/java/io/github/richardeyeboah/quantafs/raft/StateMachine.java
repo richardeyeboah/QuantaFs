@@ -23,6 +23,9 @@ public interface StateMachine {
     LogPosition lastApplied();
 
     void apply(LogEntry entry);
+    default Snapshot snapshot() { throw new UnsupportedOperationException("snapshots unsupported"); }
+    default void restore(Snapshot snapshot) { throw new UnsupportedOperationException("snapshots unsupported"); }
+
 
     /**
      * <b>Diagnostic state inspection only.</b> A copy of all application data, read locally without

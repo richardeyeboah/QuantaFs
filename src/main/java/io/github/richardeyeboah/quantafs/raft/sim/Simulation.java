@@ -534,12 +534,21 @@ public final class Simulation implements AutoCloseable {
     /** The key-value state obtained by applying committed entries 1..{@code upToIndex} in order. */
     public SortedMap<Bytes, Bytes> modelState(long upToIndex) {
         TreeMap<Bytes, Bytes> model = new TreeMap<>();
+        var sessions = new TreeMap<String,io.github.richardeyeboah.quantafs.raft.ClientSession>();
         for (long i = 1; i <= upToIndex; i++) {
             LogEntry entry = committed.get(i);
             if (entry == null) {
                 throw new IllegalStateException("index " + i + " is not known to be committed");
             }
-            switch (entry.command()) {
+            Command effective=entry.command();
+            if(effective instanceof Command.Request request) {
+                if(io.github.richardeyeboah.quantafs.raft.ClientSession.isNext(sessions.get(request.clientId()),request)) {
+                    sessions.put(request.clientId(),new io.github.richardeyeboah.quantafs.raft.ClientSession(request.sequence(),
+                            io.github.richardeyeboah.quantafs.raft.ClientSession.fingerprint(request)));effective=request.mutation();
+                } else effective=Command.noOp();
+            }
+            switch (effective) {
+                case Command.Request ignored -> throw new IllegalStateException("nested request");
                 case Command.Put put -> model.put(put.key(), put.value());
                 case Command.Delete delete -> model.remove(delete.key());
                 case Command.NoOp noOp -> { }

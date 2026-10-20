@@ -39,6 +39,8 @@ public final class ClusterServer implements AutoCloseable {
     private RaftNode node;
     private Server server;
     private volatile boolean closing, fatal;
+    private boolean snapshotLimited;
+    private long nextSnapshotAttempt;
     private record Position(long index,long term) {}
     private record Pending(Runnable success, java.util.function.Consumer<Status> failure, long expires) {}
 
@@ -108,6 +110,10 @@ public final class ClusterServer implements AutoCloseable {
                 try {
                     action.run();
                     finishOutcomes();
+                    if(node!=null && !fatal && !node.isHalted() && node.lastApplied()-node.snapshotIndex()>=64 && System.nanoTime()>=nextSnapshotAttempt) {
+                        snapshotLimited=!node.compact();
+                        nextSnapshotAttempt=snapshotLimited?System.nanoTime()+TimeUnit.SECONDS.toNanos(30):0;
+                    }
                     if(node!=null && node.isHalted()) failAll("consensus halted");
                 } catch (RuntimeException e) {
                     fatal=true;
@@ -140,6 +146,7 @@ public final class ClusterServer implements AutoCloseable {
             if(p!=null) {
                 if(o.status()==ProposalOutcome.Status.COMMITTED) {
                     try { p.success().run(); }
+                    catch(StatusRuntimeException e) { p.failure().accept(e.getStatus()); }
                     catch(RuntimeException e) { p.failure().accept(Status.INTERNAL.withDescription("application read failed")); throw e; }
                 } else p.failure().accept(Status.UNAVAILABLE.withDescription("leadership changed; outcome unknown"));
             }
@@ -221,17 +228,34 @@ public final class ClusterServer implements AutoCloseable {
                     .setRole(node.role().name()).setTerm(node.currentTerm())
                     .setLeader(node.leaderId().map(NodeId::value).orElse(""))
                     .setCommitIndex(node.commitIndex()).setAppliedIndex(node.lastApplied())
-                    .setHalted(fatal||node.isHalted()).setPendingRequests(pending.size()).build())))
+                    .setHalted(fatal||node.isHalted()).setPendingRequests(pending.size())
+                    .setSnapshotIndex(node.snapshotIndex()).setRetainedEntries(node.retainedEntries())
+                    .setSnapshotLimited(snapshotLimited).setClusterKey(settings.clusterKey()).build())))
                 error(response,Status.UNAVAILABLE);
+        }
+    }
+    private static Command sessionCommand(String id,long sequence,Command mutation) {
+        return id.isEmpty() && sequence==0 ? mutation : new Command.Request(id,sequence,mutation);
+    }
+    private void checkSession(Command command) {
+        if(command instanceof Command.Request request) {
+            switch(machine.requestResult(request)) {
+                case SUCCESS -> { }
+                case STALE -> throw Status.OUT_OF_RANGE.withDescription("request older than latest completed sequence").asRuntimeException();
+                case GAP -> throw Status.FAILED_PRECONDITION.withDescription("client must use consecutive sequences starting at 1").asRuntimeException();
+                case CONFLICT -> throw Status.ALREADY_EXISTS.withDescription("request identity reused with different payload").asRuntimeException();
+            }
         }
     }
     private final class KeyValues extends KeyValueServiceGrpc.KeyValueServiceImplBase {
         @Override public void put(PutRequest r,StreamObserver<PutResponse> response) {
-            try { propose(response,Command.put(r.getKey().toByteArray(),r.getValue().toByteArray()),PutResponse::getDefaultInstance); }
+            try { Command c=sessionCommand(r.getClientId(),r.getSequence(),Command.put(r.getKey().toByteArray(),r.getValue().toByteArray()));
+                propose(response,c,() -> { checkSession(c); return PutResponse.getDefaultInstance(); }); }
             catch(IllegalArgumentException e) { error(response,Status.INVALID_ARGUMENT.withDescription(e.getMessage())); }
         }
         @Override public void delete(DeleteRequest r,StreamObserver<DeleteResponse> response) {
-            try { propose(response,Command.delete(r.getKey().toByteArray()),DeleteResponse::getDefaultInstance); }
+            try { Command c=sessionCommand(r.getClientId(),r.getSequence(),Command.delete(r.getKey().toByteArray()));
+                propose(response,c,() -> { checkSession(c); return DeleteResponse.getDefaultInstance(); }); }
             catch(IllegalArgumentException e) { error(response,Status.INVALID_ARGUMENT.withDescription(e.getMessage())); }
         }
         @Override public void get(GetRequest r,StreamObserver<GetResponse> response) {

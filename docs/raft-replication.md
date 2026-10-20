@@ -1,5 +1,9 @@
 # Milestone 2B: durable log replication, safe commitment, ordered application
 
+This is a historical milestone checkpoint. The current automatic retry client and snapshot/log
+cleanup implementation are documented in [milestones 4–5](retries-and-snapshots.md).
+
+
 Milestone 2B extends the deterministic Raft core from [milestone 2A](raft-election.md) with the
 replication half of Raft:
 - a durable, term-tagged log;

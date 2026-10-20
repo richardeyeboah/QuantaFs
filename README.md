@@ -4,21 +4,20 @@
 
 QuantaFs is a distributed key-value storage engine being built in Java with Raft consensus, gRPC, and RocksDB. The goal is to keep acknowledged writes durable and the cluster consistent through server crashes and network partitions.
 
-**Status: milestones 1 and 2 provide a durable single-node service and a tested Raft core.
-Milestone 3 connects that core to real gRPC transport and the public key-value API in separate
-local Java processes. Three- and five-node groups support leader failover, disk recovery, and
-consensus-barrier reads. This is a local development cluster, with no remote security or
-production performance claims.**
+**Status: the local cluster now includes automatic leader discovery, journaled retry-safe mutations,
+and snapshots with log-prefix cleanup and lagging-node recovery. These work on top of the durable
+Raft core and real gRPC transport. Deployment has deliberately not started: no Docker/Kubernetes
+or remote-host setup is included.**
 
 ## Implemented today vs. planned
 
 | Implemented | Planned (not implemented) |
 | --- | --- |
-| **M1:** gRPC + Protocol Buffers API: `Put`, `Get`, `Delete` on byte keys/values | Automatic client leader discovery and safe retry deduplication |
+| **M1:** gRPC + Protocol Buffers API: `Put`, `Get`, `Delete` on byte keys/values | Deployment security and remote-host support |
 | **M1:** Explicit missing-key result (`found = false`), input validation, documented gRPC status codes | Remote hosts with authenticated, encrypted transport |
 | **M1:** RocksDB storage with a configurable data directory; writes acknowledged only after the WAL is synced | Read-index optimization (current cluster reads use a replicated barrier) |
-| **M1:** Graceful shutdown, demo CLI, gRPC tests, restart and process-level SIGKILL recovery tests | Request IDs and retry deduplication |
-| **M2A:** Raft leader election: roles, terms, randomized timeouts, `RequestVote`, majority voting, heartbeats | Snapshots and log compaction |
+| **M1:** Graceful shutdown, demo CLI, gRPC tests, restart and process-level SIGKILL recovery tests | Chunked snapshots for images larger than 8 MiB |
+| **M2A:** Raft leader election: roles, terms, randomized timeouts, `RequestVote`, majority voting, heartbeats | Streaming snapshots and large-dataset tuning |
 | **M2B:** Durable term-tagged log (`PUT`, `DELETE`, `NO_OP`); full `AppendEntries` with log matching, `nextIndex`/`matchIndex`, catch-up, conflict repair | PreVote, leadership transfer, membership changes |
 | **M2B:** Majority commitment restricted to current-term entries (leader `NO_OP`; Figure 8 tested) | Docker images, Kubernetes manifests |
 | **M2B:** Term, vote, and log in one atomic synced RocksDB write; OS-locked node directories; corruption refuses startup | Power-loss fault injection, benchmarks |
@@ -28,6 +27,8 @@ production performance claims.**
 | **M3:** Real gRPC peer transport; public Put/Delete confirm after Raft commitment and local application | |
 | **M3:** Get uses a fresh majority-committed read barrier; followers return leader hints | |
 | **M3:** Three-/five-process failure and recovery tests; fixed identities and node directory ownership | |
+| **M4:** Automatic leader discovery, durable client journals, and replicated sequential-session deduplication | |
+| **M5:** Checksummed snapshots include data and sessions; compacted-prefix recovery and snapshot transfer | |
 | GitHub Actions workflow configured for all tests (hosted execution was blocked by an account billing lock) | |
 
 Design, exact semantics, durability policy, and test limits:
@@ -35,12 +36,13 @@ Design, exact semantics, durability policy, and test limits:
 - Milestone 2A: [docs/raft-election.md](docs/raft-election.md)
 - Milestone 2B: [docs/raft-replication.md](docs/raft-replication.md)
 - Milestone 3: [docs/network-cluster.md](docs/network-cluster.md)
+- Milestones 4–5: [docs/retries-and-snapshots.md](docs/retries-and-snapshots.md)
 
 ## Try the real cluster
 
 ```bash
 ./mvnw verify
-python3 scripts/cluster-demo.py
+python3 scripts/cluster-demo.py --advanced
 ```
 
 The demo starts three separate Java processes, saves an order, forcibly terminates the leader,
@@ -160,7 +162,8 @@ Application / test client
 
 ## Target guarantees
 
-These are implementation goals, not verified capabilities.
+The local implementation and tests support these under the documented crash/storage and sequential
+session assumptions. Remote deployment and production-scale evidence remain outstanding.
 
 - Acknowledged writes survive supported crash-and-recovery scenarios under the documented disk durability assumptions.
 - Linearizable reads: completed writes are reflected in subsequent reads unless superseded.
@@ -179,10 +182,8 @@ Scope starts with one replication group and fixed membership. Sharding, multi-ke
   - [x] 2A: leader election, heartbeats, and durable term/vote, with deterministic simulation tests ([docs/raft-election.md](docs/raft-election.md)).
   - [x] 2B: durable log replication, commitment, and ordered state-machine application ([docs/raft-replication.md](docs/raft-replication.md)).
 - [x] Local three-/five-process gRPC cluster with durable consensus state, recovery, and barrier reads.
-- [ ] Correct reads, client retries, and request deduplication.
-  - [x] Consensus-barrier reads in network cluster mode.
-  - [ ] Automatic leader discovery and retry deduplication.
-- [ ] Snapshotting and lagging-node recovery.
+- [x] Correct reads, automatic leader discovery, and retry deduplication (sequential client-session contract).
+- [x] Snapshotting, logical log-prefix cleanup, and lagging-node recovery (8 MiB single-image limit).
 - [ ] Five-node deployment with persistent storage.
 - [ ] Fault-injection suite and reproducible benchmark reports.
 

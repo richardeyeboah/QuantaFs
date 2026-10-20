@@ -57,6 +57,10 @@ final class RecordCodec {
             out.writeLong(entry.index());
             out.writeLong(entry.term());
             switch (entry.command()) {
+                case Command.Request request -> {
+                    out.writeByte(3); out.writeUTF(request.clientId()); out.writeLong(request.sequence());
+                    writeBytes(out, Bytes.copyOf(encodeEntry(new LogEntry(entry.index(),entry.term(),request.mutation()))));
+                }
                 case Command.NoOp noOp -> out.writeByte(CMD_NO_OP);
                 case Command.Put put -> {
                     out.writeByte(CMD_PUT);
@@ -77,6 +81,7 @@ final class RecordCodec {
         long term = in.readLong();
         byte type = in.readByte();
         Command command = switch (type) {
+            case 3 -> new Command.Request(in.readUTF(),in.readLong(),decodeEntry(readBytes(in).toByteArray()).command());
             case CMD_NO_OP -> Command.noOp();
             case CMD_PUT -> new Command.Put(readBytes(in), readBytes(in));
             case CMD_DELETE -> new Command.Delete(readBytes(in));
@@ -86,6 +91,14 @@ final class RecordCodec {
         return new LogEntry(index, term, command);
     }
 
+    static byte[] encodeSnapshot(io.github.richardeyeboah.quantafs.raft.Snapshot snapshot) {
+        return frame((byte)4,out -> {out.writeLong(snapshot.position().term());out.writeLong(snapshot.position().index());writeBytes(out,snapshot.image());});
+    }
+    static io.github.richardeyeboah.quantafs.raft.Snapshot decodeSnapshot(byte[] bytes) throws IOException {
+        var in=unframe((byte)4,bytes);
+        var result=new io.github.richardeyeboah.quantafs.raft.Snapshot(new LogPosition(in.readLong(),in.readLong()),readBytes(in));
+        expectEnd(in);io.github.richardeyeboah.quantafs.raft.StateImage.decode(result);return result;
+    }
     static byte[] encodeApplied(LogPosition position) {
         return frame(APPLIED_MARKER, out -> {
             out.writeLong(position.term());
