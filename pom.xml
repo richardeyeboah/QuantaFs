@@ -24,6 +24,10 @@
 
     <!-- Path of the self-contained jar consumed by the process-level integration tests. -->
     <quantafs.jar>${project.build.directory}/quantafs.jar</quantafs.jar>
+
+    <!-- Compiled-class folders. The ide-separate-output profile gives IDE builds their own. -->
+    <quantafs.classes.dir>${project.build.directory}/classes</quantafs.classes.dir>
+    <quantafs.test-classes.dir>${project.build.directory}/test-classes</quantafs.test-classes.dir>
   </properties>
 
   <dependencyManagement>
@@ -86,6 +90,9 @@
   </dependencies>
 
   <build>
+    <outputDirectory>${quantafs.classes.dir}</outputDirectory>
+    <testOutputDirectory>${quantafs.test-classes.dir}</testOutputDirectory>
+
     <extensions>
       <!-- Detects the OS/CPU so the matching protoc binary is downloaded. -->
       <extension>
@@ -188,6 +195,32 @@
         </executions>
       </plugin>
 
+      <!--
+        protobuf-maven-plugin registers each generated-source folder only after its goal finishes.
+        IDE importers (Eclipse m2e, which Cursor/VS Code Java uses) do not reliably finish the
+        compile-custom goal in-process, so the gRPC stubs folder went missing from the editor's
+        classpath. Declaring it here makes the folder part of the static project model.
+      -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.6.2</version>
+        <executions>
+          <execution>
+            <id>add-grpc-generated-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>${project.build.directory}/generated-sources/protobuf/grpc-java</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -266,4 +299,26 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!--
+      Eclipse m2e (used by the Cursor/VS Code Java extension) sets the m2e.version property.
+      Without this profile the IDE's incremental compiler and Maven both write target/classes;
+      the IDE compiler emits class files even for code it cannot resolve (they throw
+      "Unresolved compilation problems" at runtime), and Maven's incremental build could
+      package them. Command-line Maven never activates this profile.
+    -->
+    <profile>
+      <id>ide-separate-output</id>
+      <activation>
+        <property>
+          <name>m2e.version</name>
+        </property>
+      </activation>
+      <properties>
+        <quantafs.classes.dir>${project.build.directory}/ide/classes</quantafs.classes.dir>
+        <quantafs.test-classes.dir>${project.build.directory}/ide/test-classes</quantafs.test-classes.dir>
+      </properties>
+    </profile>
+  </profiles>
 </project>

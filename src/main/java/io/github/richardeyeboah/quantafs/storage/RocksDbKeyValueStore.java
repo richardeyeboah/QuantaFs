@@ -60,8 +60,10 @@ public final class RocksDbKeyValueStore implements KeyValueStore {
             throw new StorageException("cannot create data directory " + dir, e);
         }
 
-        Options options = new Options().setCreateIfMissing(true);
-        WriteOptions syncWriteOptions = new WriteOptions().setSync(true);
+        Options options = new Options();
+        options.setCreateIfMissing(true);
+        WriteOptions syncWriteOptions = new WriteOptions();
+        syncWriteOptions.setSync(true);
         try {
             RocksDB db = RocksDB.open(options, dir.toString());
             return new RocksDbKeyValueStore(dir, options, syncWriteOptions, db);

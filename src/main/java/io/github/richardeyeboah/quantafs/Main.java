@@ -1,6 +1,7 @@
 package io.github.richardeyeboah.quantafs;
 
 import io.github.richardeyeboah.quantafs.client.QuantaCli;
+import io.github.richardeyeboah.quantafs.raft.sim.ElectionDemo;
 import io.github.richardeyeboah.quantafs.server.QuantaServer;
 import io.github.richardeyeboah.quantafs.server.ServerConfig;
 import io.github.richardeyeboah.quantafs.storage.StorageException;
@@ -9,14 +10,19 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Entry point for {@code java -jar quantafs.jar (server|client) ...}. */
+/** Entry point for {@code java -jar quantafs.jar (server|client|election-demo) ...}. */
 public final class Main {
 
     private static final String USAGE =
             """
-            Usage: java -jar quantafs.jar <server|client> [options]
+            Usage: java -jar quantafs.jar <server|client|election-demo> [options]
 
-            Run "server --help" or "client --help" for details.
+              server          single-node durable key-value server (milestone 1)
+              client          command-line client for the server
+              election-demo   deterministic simulation of the Raft election core (milestone 2A);
+                              not connected to the server and stores no data
+
+            Run "<command> --help" for details.
             """;
 
     private Main() {}
@@ -45,6 +51,7 @@ public final class Main {
                 }
             }
             case "client" -> System.exit(QuantaCli.run(rest, System.out, System.err));
+            case "election-demo" -> System.exit(ElectionDemo.run(rest, System.out, System.err));
             case "-h", "--help", "help" -> System.out.print(USAGE);
             default -> {
                 System.err.println("error: unknown command: " + args[0]);

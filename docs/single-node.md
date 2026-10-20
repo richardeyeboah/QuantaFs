@@ -209,7 +209,10 @@ Counts vary per run.
 
 ## Where Raft will fit
 
-Planned, not implemented. The current boundaries are chosen so the change is additive:
+Milestone 2A added a deterministic leader-election core in its own package
+([docs/raft-election.md](raft-election.md)). It is not connected to this server, which still
+serves every request as a single node. Wiring Raft into the request path below is planned, not
+implemented. The current boundaries are chosen so the change is additive:
 
 ```text
 today:   handler -> validate -> KeyValueStore.put -> respond
