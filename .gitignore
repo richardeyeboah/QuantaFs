@@ -1,0 +1,31 @@
+# Build output
+target/
+
+# Local RocksDB data directories (the README demo uses ./data)
+data/
+*-data/
+*.rocksdb/
+
+# Logs
+*.log
+
+# Credentials and local environment
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+credentials*
+secrets*
+
+# IDE and OS files
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+.DS_Store

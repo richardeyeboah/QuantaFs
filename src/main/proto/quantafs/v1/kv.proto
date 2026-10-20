@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package quantafs.v1;
+
+option java_multiple_files = true;
+option java_package = "io.github.richardeyeboah.quantafs.api.v1";
+option java_outer_classname = "KvProto";
+
+// Single-node key-value API.
+//
+// Keys and values are arbitrary bytes. Limits (enforced by the server):
+//   key:   1 to 1024 bytes (an empty key is rejected)
+//   value: 0 to 1 MiB      (an empty value is a valid, stored value)
+//
+// Error model (gRPC status codes):
+//   INVALID_ARGUMENT   request violates the key/value limits above
+//   RESOURCE_EXHAUSTED request exceeds the server's maximum inbound message size
+//   UNAVAILABLE        server is shutting down and the store is closed
+//   INTERNAL           storage engine failure; the outcome of a write is unknown
+//
+// A write (Put or Delete) is acknowledged only after it has been appended to the
+// storage engine's write-ahead log and that log has been synced to disk.
+service KeyValueService {
+  // Creates or overwrites the value for a key.
+  rpc Put(PutRequest) returns (PutResponse);
+
+  // Reads the current value for a key. A missing key is not an error:
+  // the response has found = false.
+  rpc Get(GetRequest) returns (GetResponse);
+
+  // Removes a key. Deleting a missing key succeeds (idempotent).
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+}
+
+message PutRequest {
+  bytes key = 1;
+  bytes value = 2;
+}
+
+message PutResponse {}
+
+message GetRequest {
+  bytes key = 1;
+}
+
+message GetResponse {
+  // True if the key exists. Needed because proto3 cannot distinguish an empty
+  // value from an absent one.
+  bool found = 1;
+  // The stored value; always empty when found is false.
+  bytes value = 2;
+}
+
+message DeleteRequest {
+  bytes key = 1;
+}
+
+message DeleteResponse {}
