@@ -5,7 +5,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Fixed local-demo deployment. Loopback is the default; Compose networking requires an explicit
+ * Fixed local-demo deployment. Loopback is the default; container networking requires an explicit
  * opt-in and is still plaintext and unauthenticated.
  */
 public record ClusterSettings(
@@ -16,7 +16,8 @@ public record ClusterSettings(
 
     public enum NetworkMode {
         LOOPBACK,
-        COMPOSE
+        COMPOSE,
+        KUBERNETES
     }
 
     public ClusterSettings {
@@ -42,6 +43,13 @@ public record ClusterSettings(
                             || !peer.getValue().host().matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"))) {
                 throw new IllegalArgumentException(
                         "compose mode requires each lowercase service DNS name to equal its node id");
+            }
+            if (networkMode == NetworkMode.KUBERNETES
+                    && (!peer.getKey().value().matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
+                            || !peer.getValue().host().equals(
+                                    peer.getKey().value() + ".quantafs-peer"))) {
+                throw new IllegalArgumentException(
+                        "kubernetes mode requires each endpoint to use <lowercase-node-id>.quantafs-peer");
             }
         }
         directory = directory.toAbsolutePath().normalize();
@@ -104,8 +112,9 @@ public record ClusterSettings(
                 switch (flags.getOrDefault("--network-mode", "loopback")) {
                     case "loopback" -> NetworkMode.LOOPBACK;
                     case "compose" -> NetworkMode.COMPOSE;
+                    case "kubernetes" -> NetworkMode.KUBERNETES;
                     default -> throw new IllegalArgumentException(
-                            "--network-mode must be loopback or compose");
+                            "--network-mode must be loopback, compose, or kubernetes");
                 };
         SortedMap<NodeId, NetworkEndpoint> peers = new TreeMap<>();
         for (String peer : flags.get("--peers").split(",", -1)) {
@@ -127,9 +136,10 @@ public record ClusterSettings(
             """
             cluster-server --id n1 \
               --peers n1=127.0.0.1:5101,n2=127.0.0.1:5102,n3=127.0.0.1:5103 \
-              --data-dir ./n1-data [--network-mode loopback|compose]
+              --data-dir ./n1-data [--network-mode loopback|compose|kubernetes]
 
             loopback is the default. compose is an explicit plaintext local-demo mode whose
-            lowercase service DNS names must exactly equal the node IDs.
+            lowercase service DNS names must exactly equal the node IDs. kubernetes is an explicit
+            local-demo mode requiring <node-id>.quantafs-peer DNS.
             """;
 }

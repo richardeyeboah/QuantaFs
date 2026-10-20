@@ -8,7 +8,7 @@ import java.util.*;
 public final class RetryCli {
     private static final String USAGE =
             """
-            cluster-client [--network-mode loopback|compose] \
+            cluster-client [--network-mode loopback|compose|kubernetes] \
               --seeds 127.0.0.1:5101,127.0.0.1:5102,127.0.0.1:5103 \
               --session ./checkout.session <put key value|get key|delete key|resume>
             """;
@@ -22,7 +22,9 @@ public final class RetryCli {
                 mode=switch(args[1]) {
                     case "loopback" -> ClusterSettings.NetworkMode.LOOPBACK;
                     case "compose" -> ClusterSettings.NetworkMode.COMPOSE;
-                    default -> throw new IllegalArgumentException("--network-mode must be loopback or compose");
+                    case "kubernetes" -> ClusterSettings.NetworkMode.KUBERNETES;
+                    default -> throw new IllegalArgumentException(
+                            "--network-mode must be loopback, compose, or kubernetes");
                 };
                 offset=2;
             }
@@ -63,10 +65,16 @@ public final class RetryCli {
             throw new IllegalArgumentException("seed endpoints must be non-empty and unique");
         for(NetworkEndpoint seed:seeds) {
             if(mode==ClusterSettings.NetworkMode.LOOPBACK && !seed.host().equals("127.0.0.1"))
-                throw new IllegalArgumentException("loopback seeds required unless --network-mode compose is explicit");
+                throw new IllegalArgumentException(
+                        "loopback seeds required unless a container network mode is explicit");
             if(mode==ClusterSettings.NetworkMode.COMPOSE
                     && !seed.host().matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"))
                 throw new IllegalArgumentException("compose seeds must use lowercase service DNS names");
+            if(mode==ClusterSettings.NetworkMode.KUBERNETES
+                    && !seed.host().matches(
+                            "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.quantafs-peer"))
+                throw new IllegalArgumentException(
+                        "kubernetes seeds must use <lowercase-node-id>.quantafs-peer");
         }
         return seeds;
     }

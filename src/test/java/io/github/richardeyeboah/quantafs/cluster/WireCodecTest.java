@@ -39,6 +39,23 @@ class WireCodecTest {
         assertEquals("0.0.0.0",compose.bindHost());
         assertEquals("n1:7000",compose.localEndpoint().authority());
         assertEquals("n1=n1:7000,n2=n2:7000,n3=n3:7000",compose.clusterKey());
+        var kubernetes=ClusterSettings.parse(new String[]{"--id","quantafs-0","--peers",
+                "quantafs-2=quantafs-2.quantafs-peer:7000,"
+                        + "quantafs-0=quantafs-0.quantafs-peer:7000,"
+                        + "quantafs-1=quantafs-1.quantafs-peer:7000",
+                "--data-dir","/var/lib/quantafs","--network-mode","kubernetes"});
+        assertEquals("0.0.0.0",kubernetes.bindHost());
+        assertEquals("quantafs-0.quantafs-peer:7000",kubernetes.localEndpoint().authority());
+        assertEquals("quantafs-0=quantafs-0.quantafs-peer:7000,"
+                        + "quantafs-1=quantafs-1.quantafs-peer:7000,"
+                        + "quantafs-2=quantafs-2.quantafs-peer:7000",
+                kubernetes.clusterKey());
+        assertThrows(IllegalArgumentException.class,() -> ClusterSettings.parse(new String[]{
+                "--id","quantafs-0","--peers",
+                "quantafs-0=quantafs-0.other-service:7000,"
+                        + "quantafs-1=quantafs-1.other-service:7000,"
+                        + "quantafs-2=quantafs-2.other-service:7000",
+                "--data-dir","/var/lib/quantafs","--network-mode","kubernetes"}));
         assertThrows(IllegalArgumentException.class,() -> ClusterSettings.parse(new String[]{"--id","n1","--peers",
                 "n1=0.0.0.0:5101","--data-dir","./n1-data"}));
         assertThrows(IllegalArgumentException.class,() -> ClusterSettings.parse(new String[]{"--id","n1","--peers",
