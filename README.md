@@ -4,16 +4,20 @@
 
 QuantaFs is a distributed key-value storage engine being built in Java with Raft consensus, gRPC, and RocksDB. The goal is to keep acknowledged writes durable and the cluster consistent through server crashes and network partitions.
 
-**Status: milestone 1, a durable single-node key-value service, is implemented and tested. Milestone 2 (2A leader election and 2B log replication, commitment, and ordered application) is implemented as a deterministic Raft core and tested with simulated nodes inside one process. The Raft nodes are not connected to the public server and do not talk over a network yet, so the distributed guarantees below are not yet delivered by a running cluster.**
+**Status: milestones 1 and 2 provide a durable single-node service and a tested Raft core.
+Milestone 3 connects that core to real gRPC transport and the public key-value API in separate
+local Java processes. Three- and five-node groups support leader failover, disk recovery, and
+consensus-barrier reads. This is a local development cluster, with no remote security or
+production performance claims.**
 
 ## Implemented today vs. planned
 
 | Implemented | Planned (not implemented) |
 | --- | --- |
-| **M1:** gRPC + Protocol Buffers API: `Put`, `Get`, `Delete` on byte keys/values | Raft between processes over gRPC; multi-node cluster, leader-aware routing |
-| **M1:** Explicit missing-key result (`found = false`), input validation, documented gRPC status codes | Routing the public API through Raft |
-| **M1:** RocksDB storage with a configurable data directory; writes acknowledged only after the WAL is synced | Linearizable reads across replicas (read index or leases) |
-| **M1:** Graceful shutdown, demo CLI, gRPC tests, restart and process-level SIGKILL recovery tests | Request IDs and retry deduplication (exactly-once) |
+| **M1:** gRPC + Protocol Buffers API: `Put`, `Get`, `Delete` on byte keys/values | Automatic client leader discovery and safe retry deduplication |
+| **M1:** Explicit missing-key result (`found = false`), input validation, documented gRPC status codes | Remote hosts with authenticated, encrypted transport |
+| **M1:** RocksDB storage with a configurable data directory; writes acknowledged only after the WAL is synced | Read-index optimization (current cluster reads use a replicated barrier) |
+| **M1:** Graceful shutdown, demo CLI, gRPC tests, restart and process-level SIGKILL recovery tests | Request IDs and retry deduplication |
 | **M2A:** Raft leader election: roles, terms, randomized timeouts, `RequestVote`, majority voting, heartbeats | Snapshots and log compaction |
 | **M2B:** Durable term-tagged log (`PUT`, `DELETE`, `NO_OP`); full `AppendEntries` with log matching, `nextIndex`/`matchIndex`, catch-up, conflict repair | PreVote, leadership transfer, membership changes |
 | **M2B:** Majority commitment restricted to current-term entries (leader `NO_OP`; Figure 8 tested) | Docker images, Kubernetes manifests |
@@ -21,12 +25,29 @@ QuantaFs is a distributed key-value storage engine being built in Java with Raft
 | **M2B:** RocksDB state machine with atomic data + `lastApplied` marker; strict in-order apply; `commitIndex` relearned after restart | |
 | **M2B:** Internal proposal API: success only after majority commit and local apply; `UNKNOWN` if interrupted | |
 | **M2:** Deterministic simulator (delay, reorder, duplicate, drop, partition, crash, restart, injected storage/apply failures) checking election safety, log matching, committed agreement, ordered apply, and convergence | |
-| GitHub Actions workflow running all tests | |
+| **M3:** Real gRPC peer transport; public Put/Delete confirm after Raft commitment and local application | |
+| **M3:** Get uses a fresh majority-committed read barrier; followers return leader hints | |
+| **M3:** Three-/five-process failure and recovery tests; fixed identities and node directory ownership | |
+| GitHub Actions workflow configured for all tests (hosted execution was blocked by an account billing lock) | |
 
 Design, exact semantics, durability policy, and test limits:
 - Milestone 1: [docs/single-node.md](docs/single-node.md)
 - Milestone 2A: [docs/raft-election.md](docs/raft-election.md)
 - Milestone 2B: [docs/raft-replication.md](docs/raft-replication.md)
+- Milestone 3: [docs/network-cluster.md](docs/network-cluster.md)
+
+## Try the real cluster
+
+```bash
+./mvnw verify
+python3 scripts/cluster-demo.py
+```
+
+The demo starts three separate Java processes, saves an order, forcibly terminates the leader,
+reads the confirmed order from the replacement, and restarts the old node to demonstrate catch-up.
+Use `--nodes 5` for five processes. It owns only temporary storage and cleans up its processes.
+See [the network cluster walkthrough](docs/network-cluster.md) for manual commands, architecture,
+read guarantees, test evidence, and limitations.
 
 ## Quickstart (single node)
 
@@ -157,8 +178,10 @@ Scope starts with one replication group and fixed membership. Sharding, multi-ke
 - [x] Deterministic Raft core with election and replication tests (in-process simulation; no network transport yet).
   - [x] 2A: leader election, heartbeats, and durable term/vote, with deterministic simulation tests ([docs/raft-election.md](docs/raft-election.md)).
   - [x] 2B: durable log replication, commitment, and ordered state-machine application ([docs/raft-replication.md](docs/raft-replication.md)).
-- [ ] Three-node cluster with durable consensus state and recovery.
+- [x] Local three-/five-process gRPC cluster with durable consensus state, recovery, and barrier reads.
 - [ ] Correct reads, client retries, and request deduplication.
+  - [x] Consensus-barrier reads in network cluster mode.
+  - [ ] Automatic leader discovery and retry deduplication.
 - [ ] Snapshotting and lagging-node recovery.
 - [ ] Five-node deployment with persistent storage.
 - [ ] Fault-injection suite and reproducible benchmark reports.

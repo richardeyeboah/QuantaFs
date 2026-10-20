@@ -138,6 +138,15 @@ public final class RaftNode {
         if (command instanceof Command.NoOp) {
             throw new IllegalArgumentException("NO_OP entries are internal to the leader");
         }
+        return proposeInternal(command);
+    }
+
+    /** Orders a read after a fresh majority-committed entry; caller reads on the same event loop. */
+    public ProposeResult proposeReadBarrier() {
+        return proposeInternal(Command.noOp());
+    }
+
+    private ProposeResult proposeInternal(Command command) {
         if (isHalted()) {
             return new ProposeResult.Unavailable("node halted: " + haltCause.getMessage());
         }

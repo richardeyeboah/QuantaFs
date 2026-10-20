@@ -16,10 +16,12 @@ public final class Main {
 
     private static final String USAGE =
             """
-            Usage: java -jar quantafs.jar <server|client|election-demo|replication-demo> [options]
+            Usage: java -jar quantafs.jar <server|client|cluster-server|cluster-status|election-demo|replication-demo> [options]
 
               server            single-node durable key-value server (milestone 1)
               client            command-line client for the server
+              cluster-server    real local Raft node (3 or 5 fixed voters)
+              cluster-status    inspect a local cluster node's role and progress
               election-demo     deterministic simulation of Raft leader election (milestone 2A)
               replication-demo  deterministic simulation of Raft log replication with per-node
                                 RocksDB storage in a temporary directory (milestone 2B)
@@ -54,6 +56,8 @@ public final class Main {
                     System.exit(code);
                 }
             }
+            case "cluster-server" -> runCluster(rest);
+            case "cluster-status" -> System.exit(io.github.richardeyeboah.quantafs.cluster.ClusterCommands.status(rest));
             case "client" -> System.exit(QuantaCli.run(rest, System.out, System.err));
             case "election-demo" -> System.exit(ElectionDemo.run(rest, System.out, System.err));
             case "replication-demo" -> System.exit(ReplicationDemo.run(rest, System.out, System.err));
@@ -63,6 +67,21 @@ public final class Main {
                 System.err.print(USAGE);
                 System.exit(2);
             }
+        }
+    }
+
+    private static void runCluster(String[] args) {
+        if (Arrays.asList(args).contains("--help")) {
+            System.out.println(io.github.richardeyeboah.quantafs.cluster.ClusterSettings.USAGE); return;
+        }
+        try (var cluster = io.github.richardeyeboah.quantafs.cluster.ClusterServer.start(
+                io.github.richardeyeboah.quantafs.cluster.ClusterSettings.parse(args))) {
+            Thread hook = new Thread(cluster::close, "cluster-shutdown");
+            Runtime.getRuntime().addShutdownHook(hook);
+            try { cluster.awaitTermination(); }
+            finally { try { Runtime.getRuntime().removeShutdownHook(hook); } catch(IllegalStateException ignored) {} }
+        } catch (Exception e) {
+            System.err.println("Cluster startup/runtime failed: " + e.getMessage()); System.exit(1);
         }
     }
 

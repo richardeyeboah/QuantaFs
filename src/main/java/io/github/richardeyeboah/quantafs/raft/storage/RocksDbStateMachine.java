@@ -158,6 +158,17 @@ public final class RocksDbStateMachine implements StateMachine, AutoCloseable {
         return Collections.unmodifiableSortedMap(contents);
     }
 
+    /** Local lookup only. Cluster clients must first complete a Raft read barrier. */
+    public synchronized java.util.Optional<byte[]> readApplied(byte[] key) {
+        ensureUsable();
+        try {
+            return java.util.Optional.ofNullable(db.get(data, key));
+        } catch (RocksDBException e) {
+            failed = true;
+            throw new StateMachineException("cannot read applied state", e);
+        }
+    }
+
     public Path directory() {
         return directory;
     }

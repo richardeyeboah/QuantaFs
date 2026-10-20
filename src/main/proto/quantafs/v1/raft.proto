@@ -1,0 +1,38 @@
+syntax = "proto3";
+package quantafs.v1;
+option java_multiple_files = true;
+option java_package = "io.github.richardeyeboah.quantafs.api.v1";
+option java_outer_classname = "RaftProto";
+service RaftTransport {
+  // Receipt means admitted to the event queue, not replicated or committed.
+  rpc Deliver(RaftEnvelope) returns (DeliveryReceipt);
+  rpc Status(NodeStatusRequest) returns (NodeStatus);
+}
+message DeliveryReceipt {}
+message NodeStatusRequest {}
+message NodeStatus {
+ string id = 1; string role = 2; int64 term = 3; string leader = 4;
+ int64 commit_index = 5; int64 applied_index = 6; bool halted = 7;
+ int32 pending_requests = 8;
+}
+message WireEntry {
+ int64 index = 1; int64 term = 2;
+ enum Kind { NO_OP = 0; PUT = 1; DELETE = 2; }
+ Kind kind = 3; bytes key = 4; bytes value = 5;
+}
+message VoteCall { int64 last_term = 1; int64 last_index = 2; }
+message VoteReply { bool granted = 1; }
+message AppendCall {
+ int64 prev_index = 1; int64 prev_term = 2; repeated WireEntry entries = 3; int64 commit_index = 4;
+}
+message AppendReply {
+ int64 request_term = 1; bool success = 2; int64 request_prev_index = 3;
+ int64 match_index = 4; int64 last_index = 5;
+}
+message RaftEnvelope {
+ string cluster_key = 1; string sender = 2; string receiver = 3; int64 term = 4;
+ oneof payload {
+  VoteCall vote_call = 5; VoteReply vote_reply = 6;
+  AppendCall append_call = 7; AppendReply append_reply = 8;
+ }
+}
