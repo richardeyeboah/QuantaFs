@@ -6,9 +6,9 @@ A distributed key-value store built in **Java** with **Raft consensus, gRPC, and
 Writes succeed after majority commitment and local application. Retry-safe sequential sessions,
 snapshots, and persistent recovery handle the failures around that promise.
 
-https://github.com/user-attachments/assets/09bb0814-8f3d-41e4-a314-b02a347fb36b
+https://github.com/user-attachments/assets/dc12ddce-c965-4ef6-9ab4-46bf61bf3366
 
-**[Watch the 70-second demo](https://github.com/user-attachments/assets/09bb0814-8f3d-41e4-a314-b02a347fb36b)** ·
+**[Watch the 70-second demo](https://github.com/user-attachments/assets/dc12ddce-c965-4ef6-9ab4-46bf61bf3366)** ·
 [Run the same recovery test](docs/demo.md) ·
 [Inspect the captured evidence](docs/media/demo-evidence/trace.json)
 

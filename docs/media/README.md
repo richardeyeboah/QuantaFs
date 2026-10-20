@@ -1,6 +1,6 @@
 # QuantaFs recovery demo
 
-[Watch the 70-second video](https://github.com/user-attachments/assets/09bb0814-8f3d-41e4-a314-b02a347fb36b)
+[Watch the 70-second video](https://github.com/user-attachments/assets/dc12ddce-c965-4ef6-9ab4-46bf61bf3366)
 
 [Download the MP4](quantafs-demo.mp4) · [Animated preview](quantafs-demo-preview.gif) ·
 [Captured commands/results](demo-evidence/trace.json) · [Test transcript](demo-evidence/transcript.txt)

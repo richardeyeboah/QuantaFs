@@ -1,6 +1,6 @@
 # Demonstrating QuantaFs in an interview
 
-[Watch the captioned 70-second demo](https://github.com/user-attachments/assets/09bb0814-8f3d-41e4-a314-b02a347fb36b).
+[Watch the captioned 70-second demo](https://github.com/user-attachments/assets/dc12ddce-c965-4ef6-9ab4-46bf61bf3366).
 It is an edited replay of a real captured local run; waits are shortened.
 
 ## Start with the problem
