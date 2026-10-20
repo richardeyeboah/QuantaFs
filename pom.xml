@@ -10,7 +10,7 @@
   <packaging>jar</packaging>
 
   <name>QuantaFs</name>
-  <description>Fault-tolerant key-value store (milestone 1: durable single-node service)</description>
+  <description>Raft-based key-value store with durable replication, retry-safe sessions, and local Kubernetes deployment</description>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>

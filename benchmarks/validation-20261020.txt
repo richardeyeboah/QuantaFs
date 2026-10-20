@@ -1,0 +1,19 @@
+Local verification, October 20, 2026
+520 unit/in-process/simulation + 6 process integration tests = 526 total.
+
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.458 s -- in io.github.richardeyeboah.quantafs.raft.RocksDbRaftStorageContractTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in io.github.richardeyeboah.quantafs.raft.ElectionValueTypesTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in io.github.richardeyeboah.quantafs.raft.InMemoryRaftStorageContractTest
+[INFO] Tests run: 520, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Finished at: 2026-10-20T02:35:34-05:00
+
+Kubernetes recovery demonstration:
+Replacing leader quantafs-2; Pod UID=1d8d41d1-312b-445d-9a28-c7b35055abc5; volume=pvc-905e0446-3a4c-4079-8539-c6901f90352d
+PASS: replacement Pod reused the same PVC and data remained readable
+PASS: minority refused the read without halting
+PASS: majority restored, all nodes caught up, original data readable; cluster remains running
+
+Benchmark samples: 6000 total, 3000 PUT and 3000 GET, all successful.
+CSV counts and nearest-rank p99 summaries independently reconciled.

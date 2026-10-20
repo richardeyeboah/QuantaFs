@@ -266,4 +266,6 @@ not tolerate loss of the Docker host, its disk, or two voters. It does not prove
 durability. Before any remote or production network is enabled, QuantaFs needs authenticated peer
 identity, TLS, client access control, secret handling, and an explicit threat model.
 
-Kubernetes remains the next user-controlled stage and is not implemented here.
+Stage 3 now provides separate local Kubernetes manifests and documentation. They have been validated
+and run on Docker Desktop Kubernetes; see
+[the Kubernetes walkthrough](kubernetes-walkthrough.md). This Compose stage remains unchanged.

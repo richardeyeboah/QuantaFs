@@ -1,0 +1,2 @@
+Picked up JAVA_TOOL_OPTIONS: -Xms16m -Xmx64m
+elapsed_ns=7686595212

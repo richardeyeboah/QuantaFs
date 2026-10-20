@@ -1,0 +1,1430 @@
+{
+  "timestamp_utc": "20261020T073222Z",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "git_commit": "9ca52960ba2f22e083b6899bd29ad6fcf900c485",
+  "dirty_files": [
+    " M README.md",
+    " M docs/compose-walkthrough.md",
+    " M docs/container-walkthrough.md",
+    " M src/main/java/io/github/richardeyeboah/quantafs/cluster/ClusterSettings.java",
+    " M src/main/java/io/github/richardeyeboah/quantafs/cluster/RetryCli.java",
+    " M src/test/java/io/github/richardeyeboah/quantafs/cluster/NetworkConfigurationTest.java",
+    " M src/test/java/io/github/richardeyeboah/quantafs/cluster/WireCodecTest.java",
+    "?? deploy/",
+    "?? docs/kubernetes-walkthrough.md",
+    "?? scripts/QuantaBenchmark.java",
+    "?? scripts/benchmark-kubernetes.py",
+    "?? scripts/kubernetes-demo.py"
+  ],
+  "jar_sha256": "81a59fcbfb0915d96d3129023648d7d6165843cd09c15a654d646e702ab125a7",
+  "source_sha256": "5412f0698c4ac29126ab63631aaeb6e4c3da61dd30bdba199fb00312ffba1cee",
+  "docker_resources": {
+    "cpus": 6,
+    "memory_bytes": 4106870784
+  },
+  "nodes": {
+    "apiVersion": "v1",
+    "items": [
+      {
+        "apiVersion": "v1",
+        "kind": "Node",
+        "metadata": {
+          "annotations": {
+            "node.alpha.kubernetes.io/ttl": "0",
+            "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+          },
+          "creationTimestamp": "2026-10-20T07:00:10Z",
+          "labels": {
+            "beta.kubernetes.io/arch": "arm64",
+            "beta.kubernetes.io/os": "linux",
+            "kubernetes.io/arch": "arm64",
+            "kubernetes.io/hostname": "docker-desktop",
+            "kubernetes.io/os": "linux",
+            "node-role.kubernetes.io/control-plane": "",
+            "node.kubernetes.io/exclude-from-external-load-balancers": ""
+          },
+          "name": "docker-desktop",
+          "resourceVersion": "4497",
+          "uid": "93f07d41-d3f1-43a5-bf32-95013d4aa99e"
+        },
+        "spec": {},
+        "status": {
+          "addresses": [
+            {
+              "address": "192.168.65.3",
+              "type": "InternalIP"
+            },
+            {
+              "address": "docker-desktop",
+              "type": "Hostname"
+            }
+          ],
+          "allocatable": {
+            "cpu": "6",
+            "ephemeral-storage": "216063361486",
+            "hugepages-1Gi": "0",
+            "hugepages-2Mi": "0",
+            "hugepages-32Mi": "0",
+            "hugepages-64Ki": "0",
+            "memory": "3908216Ki",
+            "pods": "110"
+          },
+          "capacity": {
+            "cpu": "6",
+            "ephemeral-storage": "234443752Ki",
+            "hugepages-1Gi": "0",
+            "hugepages-2Mi": "0",
+            "hugepages-32Mi": "0",
+            "hugepages-64Ki": "0",
+            "memory": "4010616Ki",
+            "pods": "110"
+          },
+          "conditions": [
+            {
+              "lastHeartbeatTime": "2026-10-20T07:32:02Z",
+              "lastTransitionTime": "2026-10-20T07:00:10Z",
+              "message": "kubelet has sufficient memory available",
+              "reason": "KubeletHasSufficientMemory",
+              "status": "False",
+              "type": "MemoryPressure"
+            },
+            {
+              "lastHeartbeatTime": "2026-10-20T07:32:02Z",
+              "lastTransitionTime": "2026-10-20T07:00:10Z",
+              "message": "kubelet has no disk pressure",
+              "reason": "KubeletHasNoDiskPressure",
+              "status": "False",
+              "type": "DiskPressure"
+            },
+            {
+              "lastHeartbeatTime": "2026-10-20T07:32:02Z",
+              "lastTransitionTime": "2026-10-20T07:00:10Z",
+              "message": "kubelet has sufficient PID available",
+              "reason": "KubeletHasSufficientPID",
+              "status": "False",
+              "type": "PIDPressure"
+            },
+            {
+              "lastHeartbeatTime": "2026-10-20T07:32:02Z",
+              "lastTransitionTime": "2026-10-20T07:00:16Z",
+              "message": "kubelet is posting ready status",
+              "reason": "KubeletReady",
+              "status": "True",
+              "type": "Ready"
+            }
+          ],
+          "daemonEndpoints": {
+            "kubeletEndpoint": {
+              "Port": 10250
+            }
+          },
+          "declaredFeatures": [
+            "ExtendWebSocketsToKubelet",
+            "InPlacePodLevelResourcesVerticalScaling",
+            "InPlacePodVerticalScalingInitContainers",
+            "RestartAllContainersOnContainerExits"
+          ],
+          "images": [
+            {
+              "names": [
+                "quantafs@sha256:7471a5bdccb77f8553f9c6ca879b35c55032749c1a03af8095d72d8c146c8ac4",
+                "quantafs:stage3"
+              ],
+              "sizeBytes": 617915107
+            },
+            {
+              "names": [
+                "quantafs@sha256:5c289b97843dc0eccb426ef106a72df89d13f73583b1feb721f79a95143c97fd",
+                "quantafs:stage2"
+              ],
+              "sizeBytes": 617915084
+            },
+            {
+              "names": [
+                "quantafs@sha256:0f186da58f3c1f0d301f148e12ab0fb133097913eff02392ba1d2764fba9f0eb",
+                "quantafs:stage1"
+              ],
+              "sizeBytes": 617900383
+            },
+            {
+              "names": [
+                "docker/desktop-kubernetes@sha256:65e5eddaacf5813d581a13faa525196dd52d5be0c6e43cc5a4b54c8042077182",
+                "docker/desktop-kubernetes:kubernetes-v1.36.1-cni-v1.9.1-critools-v1.35.0-cri-dockerd-v0.4.4-1-debian"
+              ],
+              "sizeBytes": 551071018
+            },
+            {
+              "names": [
+                "registry.k8s.io/kube-apiserver@sha256:2460df74307cafacf674573c88df511aeb1aece9daa7fbd968fe27cb1c8c4588",
+                "registry.k8s.io/kube-apiserver:v1.36.1"
+              ],
+              "sizeBytes": 118680878
+            },
+            {
+              "names": [
+                "registry.k8s.io/kube-proxy@sha256:a96b6e12863ef766d18f69afaad7a5329220c37ce21cb232bcb58362d284f3f7",
+                "registry.k8s.io/kube-proxy:v1.36.1"
+              ],
+              "sizeBytes": 108602105
+            },
+            {
+              "names": [
+                "registry.k8s.io/kube-controller-manager@sha256:c8adb8daee5b30576bd87638a89351ab8388b3fda466bedb7eacf10cde77dbe7",
+                "registry.k8s.io/kube-controller-manager:v1.36.1"
+              ],
+              "sizeBytes": 106032925
+            },
+            {
+              "names": [
+                "registry.k8s.io/coredns/coredns@sha256:e7e6440cfd1e919280958f5b5a6ab2b184d385bba774c12ad2a9e1e4183f90d9",
+                "registry.k8s.io/coredns/coredns:v1.14.2"
+              ],
+              "sizeBytes": 94922321
+            },
+            {
+              "names": [
+                "registry.k8s.io/etcd@sha256:397189418d1a00e500c0605ad18d1baf3b541a1004d768448c367e48071622e5",
+                "registry.k8s.io/etcd:3.6.8-0"
+              ],
+              "sizeBytes": 84275724
+            },
+            {
+              "names": [
+                "registry.k8s.io/kube-scheduler@sha256:3a4333e8ba6e1f74c9bc467c791a06a26808474e8819582cf130cfe0fddc3155",
+                "registry.k8s.io/kube-scheduler:v1.36.1"
+              ],
+              "sizeBytes": 77923253
+            },
+            {
+              "names": [
+                "docker/desktop-storage-provisioner@sha256:ca46f2a97ef4ef84c517c654fee37bcec0b93f8082cf7940c96cdca6a728ed1e",
+                "docker/desktop-storage-provisioner:v4.0"
+              ],
+              "sizeBytes": 76819223
+            },
+            {
+              "names": [
+                "docker/desktop-vpnkit-controller@sha256:8cb4e79ec634a5c8cd01f16016cd90be715e31bf3694ac0898b0354a0dc2efd2",
+                "docker/desktop-vpnkit-controller:v4.0"
+              ],
+              "sizeBytes": 50011033
+            },
+            {
+              "names": [
+                "registry.k8s.io/pause@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4",
+                "registry.k8s.io/pause:3.10.2"
+              ],
+              "sizeBytes": 785726
+            }
+          ],
+          "nodeInfo": {
+            "architecture": "arm64",
+            "bootID": "789643c6-b70c-49b3-b6d0-8810264f36ba",
+            "containerRuntimeVersion": "docker://29.9.1",
+            "kernelVersion": "7.0.14-linuxkit",
+            "kubeProxyVersion": "",
+            "kubeletVersion": "v1.36.1",
+            "machineID": "977423cadd1343df9a8e4ae1d974d946",
+            "operatingSystem": "linux",
+            "osImage": "Docker Desktop",
+            "swap": {
+              "capacity": 1073737728
+            },
+            "systemUUID": "977423cadd1343df9a8e4ae1d974d946"
+          }
+        }
+      }
+    ],
+    "kind": "List",
+    "metadata": {
+      "resourceVersion": ""
+    }
+  },
+  "pods": {
+    "apiVersion": "v1",
+    "items": [
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "creationTimestamp": "2026-10-20T07:03:21Z",
+          "generateName": "quantafs-",
+          "generation": 1,
+          "labels": {
+            "app.kubernetes.io/component": "server",
+            "app.kubernetes.io/name": "quantafs",
+            "apps.kubernetes.io/pod-index": "0",
+            "controller-revision-hash": "quantafs-76bc56b97b",
+            "statefulset.kubernetes.io/pod-name": "quantafs-0"
+          },
+          "name": "quantafs-0",
+          "namespace": "quantafs-local",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "StatefulSet",
+              "name": "quantafs",
+              "uid": "9522821d-026b-48a8-b949-75b3dbf57efe"
+            }
+          ],
+          "resourceVersion": "1074",
+          "uid": "bc228ef1-2e1c-4d02-b283-ef8ec129e939"
+        },
+        "spec": {
+          "automountServiceAccountToken": false,
+          "containers": [
+            {
+              "args": [
+                "exec java -Xms64m -Xmx512m -XX:+ExitOnOutOfMemoryError -jar /opt/quantafs/quantafs.jar cluster-server \\\n  --id \"${POD_NAME}\" \\\n  --peers \"quantafs-0=quantafs-0.quantafs-peer:7000,quantafs-1=quantafs-1.quantafs-peer:7000,quantafs-2=quantafs-2.quantafs-peer:7000\" \\\n  --data-dir /var/lib/quantafs \\\n  --network-mode kubernetes\n"
+              ],
+              "command": [
+                "/bin/sh",
+                "-ec"
+              ],
+              "env": [
+                {
+                  "name": "POD_NAME",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.name"
+                    }
+                  }
+                }
+              ],
+              "image": "quantafs:stage3",
+              "imagePullPolicy": "Never",
+              "livenessProbe": {
+                "exec": {
+                  "command": [
+                    "java",
+                    "-Xms16m",
+                    "-Xmx64m",
+                    "-jar",
+                    "/opt/quantafs/quantafs.jar",
+                    "cluster-status",
+                    "--target",
+                    "127.0.0.1:7000"
+                  ]
+                },
+                "failureThreshold": 3,
+                "periodSeconds": 20,
+                "successThreshold": 1,
+                "timeoutSeconds": 10
+              },
+              "name": "quantafs",
+              "ports": [
+                {
+                  "containerPort": 7000,
+                  "name": "grpc",
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "exec": {
+                  "command": [
+                    "java",
+                    "-Xms16m",
+                    "-Xmx64m",
+                    "-jar",
+                    "/opt/quantafs/quantafs.jar",
+                    "cluster-status",
+                    "--target",
+                    "127.0.0.1:7000"
+                  ]
+                },
+                "failureThreshold": 2,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 10
+              },
+              "resources": {
+                "limits": {
+                  "cpu": "1",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "250m",
+                  "memory": "256Mi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true
+              },
+              "startupProbe": {
+                "exec": {
+                  "command": [
+                    "java",
+                    "-Xms16m",
+                    "-Xmx64m",
+                    "-jar",
+                    "/opt/quantafs/quantafs.jar",
+                    "cluster-status",
+                    "--target",
+                    "127.0.0.1:7000"
+                  ]
+                },
+                "failureThreshold": 18,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 10
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/lib/quantafs",
+                  "name": "data"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "hostname": "quantafs-0",
+          "nodeName": "docker-desktop",
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {
+            "fsGroup": 10001,
+            "fsGroupChangePolicy": "OnRootMismatch",
+            "runAsGroup": 10001,
+            "runAsNonRoot": true,
+            "runAsUser": 10001,
+            "seccompProfile": {
+              "type": "RuntimeDefault"
+            }
+          },
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "subdomain": "quantafs-peer",
+          "terminationGracePeriodSeconds": 45,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "data",
+              "persistentVolumeClaim": {
+                "claimName": "data-quantafs-0"
+              }
+            },
+            {
+              "emptyDir": {
+                "sizeLimit": "64Mi"
+              },
+              "name": "tmp"
+            }
+          ]
+        },
+        "status": {
+          "allocatedResources": {
+            "cpu": "250m",
+            "memory": "256Mi"
+          },
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:03:22Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:03:21Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:03:33Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:03:33Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:03:21Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "allocatedResources": {
+                "cpu": "250m",
+                "memory": "256Mi"
+              },
+              "containerID": "docker://e446ca8657c6efffbafa992508b18054887e7f73786f24326f9f1c48f91010f0",
+              "image": "quantafs:stage3",
+              "imageID": "docker-pullable://quantafs@sha256:7471a5bdccb77f8553f9c6ca879b35c55032749c1a03af8095d72d8c146c8ac4",
+              "lastState": {},
+              "name": "quantafs",
+              "ready": true,
+              "resources": {
+                "limits": {
+                  "cpu": "1",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "250m",
+                  "memory": "256Mi"
+                }
+              },
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-10-20T07:03:23Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/lib/quantafs",
+                  "name": "data"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                }
+              ]
+            }
+          ],
+          "hostIP": "192.168.65.3",
+          "hostIPs": [
+            {
+              "ip": "192.168.65.3"
+            }
+          ],
+          "observedGeneration": 1,
+          "phase": "Running",
+          "podIP": "10.1.0.13",
+          "podIPs": [
+            {
+              "ip": "10.1.0.13"
+            }
+          ],
+          "qosClass": "Burstable",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "1Gi"
+            },
+            "requests": {
+              "cpu": "232m",
+              "memory": "256Mi"
+            }
+          },
+          "startTime": "2026-10-20T07:03:21Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "creationTimestamp": "2026-10-20T07:31:45Z",
+          "generateName": "quantafs-",
+          "generation": 1,
+          "labels": {
+            "app.kubernetes.io/component": "server",
+            "app.kubernetes.io/name": "quantafs",
+            "apps.kubernetes.io/pod-index": "1",
+            "controller-revision-hash": "quantafs-76bc56b97b",
+            "statefulset.kubernetes.io/pod-name": "quantafs-1"
+          },
+          "name": "quantafs-1",
+          "namespace": "quantafs-local",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "StatefulSet",
+              "name": "quantafs",
+              "uid": "9522821d-026b-48a8-b949-75b3dbf57efe"
+            }
+          ],
+          "resourceVersion": "4484",
+          "uid": "7f3e7d73-072c-4767-ba90-fa554be46800"
+        },
+        "spec": {
+          "automountServiceAccountToken": false,
+          "containers": [
+            {
+              "args": [
+                "exec java -Xms64m -Xmx512m -XX:+ExitOnOutOfMemoryError -jar /opt/quantafs/quantafs.jar cluster-server \\\n  --id \"${POD_NAME}\" \\\n  --peers \"quantafs-0=quantafs-0.quantafs-peer:7000,quantafs-1=quantafs-1.quantafs-peer:7000,quantafs-2=quantafs-2.quantafs-peer:7000\" \\\n  --data-dir /var/lib/quantafs \\\n  --network-mode kubernetes\n"
+              ],
+              "command": [
+                "/bin/sh",
+                "-ec"
+              ],
+              "env": [
+                {
+                  "name": "POD_NAME",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.name"
+                    }
+                  }
+                }
+              ],
+              "image": "quantafs:stage3",
+              "imagePullPolicy": "Never",
+              "livenessProbe": {
+                "exec": {
+                  "command": [
+                    "java",
+                    "-Xms16m",
+                    "-Xmx64m",
+                    "-jar",
+                    "/opt/quantafs/quantafs.jar",
+                    "cluster-status",
+                    "--target",
+                    "127.0.0.1:7000"
+                  ]
+                },
+                "failureThreshold": 3,
+                "periodSeconds": 20,
+                "successThreshold": 1,
+                "timeoutSeconds": 10
+              },
+              "name": "quantafs",
+              "ports": [
+                {
+                  "containerPort": 7000,
+                  "name": "grpc",
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "exec": {
+                  "command": [
+                    "java",
+                    "-Xms16m",
+                    "-Xmx64m",
+                    "-jar",
+                    "/opt/quantafs/quantafs.jar",
+                    "cluster-status",
+                    "--target",
+                    "127.0.0.1:7000"
+                  ]
+                },
+                "failureThreshold": 2,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 10
+              },
+              "resources": {
+                "limits": {
+                  "cpu": "1",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "250m",
+                  "memory": "256Mi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true
+              },
+              "startupProbe": {
+                "exec": {
+                  "command": [
+                    "java",
+                    "-Xms16m",
+                    "-Xmx64m",
+                    "-jar",
+                    "/opt/quantafs/quantafs.jar",
+                    "cluster-status",
+                    "--target",
+                    "127.0.0.1:7000"
+                  ]
+                },
+                "failureThreshold": 18,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 10
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/lib/quantafs",
+                  "name": "data"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "hostname": "quantafs-1",
+          "nodeName": "docker-desktop",
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {
+            "fsGroup": 10001,
+            "fsGroupChangePolicy": "OnRootMismatch",
+            "runAsGroup": 10001,
+            "runAsNonRoot": true,
+            "runAsUser": 10001,
+            "seccompProfile": {
+              "type": "RuntimeDefault"
+            }
+          },
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "subdomain": "quantafs-peer",
+          "terminationGracePeriodSeconds": 45,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "data",
+              "persistentVolumeClaim": {
+                "claimName": "data-quantafs-1"
+              }
+            },
+            {
+              "emptyDir": {
+                "sizeLimit": "64Mi"
+              },
+              "name": "tmp"
+            }
+          ]
+        },
+        "status": {
+          "allocatedResources": {
+            "cpu": "250m",
+            "memory": "256Mi"
+          },
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:46Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:46Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:58Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:58Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:45Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "allocatedResources": {
+                "cpu": "250m",
+                "memory": "256Mi"
+              },
+              "containerID": "docker://9181c5ff01735ffecff6144a0195e732bb0bc39d1399ddb9a738be81fbeb91a4",
+              "image": "quantafs:stage3",
+              "imageID": "docker-pullable://quantafs@sha256:7471a5bdccb77f8553f9c6ca879b35c55032749c1a03af8095d72d8c146c8ac4",
+              "lastState": {},
+              "name": "quantafs",
+              "ready": true,
+              "resources": {
+                "limits": {
+                  "cpu": "1",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "250m",
+                  "memory": "256Mi"
+                }
+              },
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-10-20T07:31:46Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/lib/quantafs",
+                  "name": "data"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                }
+              ]
+            }
+          ],
+          "hostIP": "192.168.65.3",
+          "hostIPs": [
+            {
+              "ip": "192.168.65.3"
+            }
+          ],
+          "observedGeneration": 1,
+          "phase": "Running",
+          "podIP": "10.1.0.17",
+          "podIPs": [
+            {
+              "ip": "10.1.0.17"
+            }
+          ],
+          "qosClass": "Burstable",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "1Gi"
+            },
+            "requests": {
+              "cpu": "232m",
+              "memory": "256Mi"
+            }
+          },
+          "startTime": "2026-10-20T07:31:46Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "creationTimestamp": "2026-10-20T07:31:45Z",
+          "generateName": "quantafs-",
+          "generation": 1,
+          "labels": {
+            "app.kubernetes.io/component": "server",
+            "app.kubernetes.io/name": "quantafs",
+            "apps.kubernetes.io/pod-index": "2",
+            "controller-revision-hash": "quantafs-76bc56b97b",
+            "statefulset.kubernetes.io/pod-name": "quantafs-2"
+          },
+          "name": "quantafs-2",
+          "namespace": "quantafs-local",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "StatefulSet",
+              "name": "quantafs",
+              "uid": "9522821d-026b-48a8-b949-75b3dbf57efe"
+            }
+          ],
+          "resourceVersion": "4487",
+          "uid": "14e94e2a-5fe0-4a62-b9db-5097be12b6fb"
+        },
+        "spec": {
+          "automountServiceAccountToken": false,
+          "containers": [
+            {
+              "args": [
+                "exec java -Xms64m -Xmx512m -XX:+ExitOnOutOfMemoryError -jar /opt/quantafs/quantafs.jar cluster-server \\\n  --id \"${POD_NAME}\" \\\n  --peers \"quantafs-0=quantafs-0.quantafs-peer:7000,quantafs-1=quantafs-1.quantafs-peer:7000,quantafs-2=quantafs-2.quantafs-peer:7000\" \\\n  --data-dir /var/lib/quantafs \\\n  --network-mode kubernetes\n"
+              ],
+              "command": [
+                "/bin/sh",
+                "-ec"
+              ],
+              "env": [
+                {
+                  "name": "POD_NAME",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.name"
+                    }
+                  }
+                }
+              ],
+              "image": "quantafs:stage3",
+              "imagePullPolicy": "Never",
+              "livenessProbe": {
+                "exec": {
+                  "command": [
+                    "java",
+                    "-Xms16m",
+                    "-Xmx64m",
+                    "-jar",
+                    "/opt/quantafs/quantafs.jar",
+                    "cluster-status",
+                    "--target",
+                    "127.0.0.1:7000"
+                  ]
+                },
+                "failureThreshold": 3,
+                "periodSeconds": 20,
+                "successThreshold": 1,
+                "timeoutSeconds": 10
+              },
+              "name": "quantafs",
+              "ports": [
+                {
+                  "containerPort": 7000,
+                  "name": "grpc",
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "exec": {
+                  "command": [
+                    "java",
+                    "-Xms16m",
+                    "-Xmx64m",
+                    "-jar",
+                    "/opt/quantafs/quantafs.jar",
+                    "cluster-status",
+                    "--target",
+                    "127.0.0.1:7000"
+                  ]
+                },
+                "failureThreshold": 2,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 10
+              },
+              "resources": {
+                "limits": {
+                  "cpu": "1",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "250m",
+                  "memory": "256Mi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true
+              },
+              "startupProbe": {
+                "exec": {
+                  "command": [
+                    "java",
+                    "-Xms16m",
+                    "-Xmx64m",
+                    "-jar",
+                    "/opt/quantafs/quantafs.jar",
+                    "cluster-status",
+                    "--target",
+                    "127.0.0.1:7000"
+                  ]
+                },
+                "failureThreshold": 18,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 10
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/lib/quantafs",
+                  "name": "data"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "hostname": "quantafs-2",
+          "nodeName": "docker-desktop",
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {
+            "fsGroup": 10001,
+            "fsGroupChangePolicy": "OnRootMismatch",
+            "runAsGroup": 10001,
+            "runAsNonRoot": true,
+            "runAsUser": 10001,
+            "seccompProfile": {
+              "type": "RuntimeDefault"
+            }
+          },
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "subdomain": "quantafs-peer",
+          "terminationGracePeriodSeconds": 45,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "data",
+              "persistentVolumeClaim": {
+                "claimName": "data-quantafs-2"
+              }
+            },
+            {
+              "emptyDir": {
+                "sizeLimit": "64Mi"
+              },
+              "name": "tmp"
+            }
+          ]
+        },
+        "status": {
+          "allocatedResources": {
+            "cpu": "250m",
+            "memory": "256Mi"
+          },
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:46Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:46Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:58Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:58Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:31:45Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "allocatedResources": {
+                "cpu": "250m",
+                "memory": "256Mi"
+              },
+              "containerID": "docker://7f980a3a25a35b09e4a4f79165e4cbb2f3d229bc1cb2beb3aff68f43cd54f209",
+              "image": "quantafs:stage3",
+              "imageID": "docker-pullable://quantafs@sha256:7471a5bdccb77f8553f9c6ca879b35c55032749c1a03af8095d72d8c146c8ac4",
+              "lastState": {},
+              "name": "quantafs",
+              "ready": true,
+              "resources": {
+                "limits": {
+                  "cpu": "1",
+                  "memory": "1Gi"
+                },
+                "requests": {
+                  "cpu": "250m",
+                  "memory": "256Mi"
+                }
+              },
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-10-20T07:31:46Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/lib/quantafs",
+                  "name": "data"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                }
+              ]
+            }
+          ],
+          "hostIP": "192.168.65.3",
+          "hostIPs": [
+            {
+              "ip": "192.168.65.3"
+            }
+          ],
+          "observedGeneration": 1,
+          "phase": "Running",
+          "podIP": "10.1.0.18",
+          "podIPs": [
+            {
+              "ip": "10.1.0.18"
+            }
+          ],
+          "qosClass": "Burstable",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "1Gi"
+            },
+            "requests": {
+              "cpu": "232m",
+              "memory": "256Mi"
+            }
+          },
+          "startTime": "2026-10-20T07:31:46Z"
+        }
+      },
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "creationTimestamp": "2026-10-20T07:00:54Z",
+          "generateName": "quantafs-client-6d58f779cf-",
+          "generation": 1,
+          "labels": {
+            "app.kubernetes.io/component": "client",
+            "app.kubernetes.io/name": "quantafs",
+            "pod-template-hash": "6d58f779cf"
+          },
+          "name": "quantafs-client-6d58f779cf-lw4tp",
+          "namespace": "quantafs-local",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "quantafs-client-6d58f779cf",
+              "uid": "aeb1e99f-1d46-4813-9a96-7bc8c25421ac"
+            }
+          ],
+          "resourceVersion": "861",
+          "uid": "9617be06-1a7a-4a19-b813-9efe4e1973e7"
+        },
+        "spec": {
+          "automountServiceAccountToken": false,
+          "containers": [
+            {
+              "args": [
+                "trap 'exit 0' TERM INT\nwhile true; do\n  sleep 3600 &\n  wait $!\ndone\n"
+              ],
+              "command": [
+                "/bin/sh",
+                "-ec"
+              ],
+              "env": [
+                {
+                  "name": "JAVA_TOOL_OPTIONS",
+                  "value": "-Xms16m -Xmx64m"
+                }
+              ],
+              "image": "quantafs:stage3",
+              "imagePullPolicy": "Never",
+              "name": "client",
+              "resources": {
+                "limits": {
+                  "cpu": "250m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "25m",
+                  "memory": "64Mi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/lib/quantafs-client",
+                  "name": "client-session"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "docker-desktop",
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {
+            "fsGroup": 10001,
+            "fsGroupChangePolicy": "OnRootMismatch",
+            "runAsGroup": 10001,
+            "runAsNonRoot": true,
+            "runAsUser": 10001,
+            "seccompProfile": {
+              "type": "RuntimeDefault"
+            }
+          },
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 10,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "client-session",
+              "persistentVolumeClaim": {
+                "claimName": "quantafs-client-session"
+              }
+            },
+            {
+              "emptyDir": {
+                "sizeLimit": "32Mi"
+              },
+              "name": "tmp"
+            }
+          ]
+        },
+        "status": {
+          "allocatedResources": {
+            "cpu": "25m",
+            "memory": "64Mi"
+          },
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:00:57Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:00:54Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:01:01Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:01:01Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-10-20T07:00:54Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "allocatedResources": {
+                "cpu": "25m",
+                "memory": "64Mi"
+              },
+              "containerID": "docker://71e25d44b1ea8a92ec3816700dbf5ac27f620a139a9e0e55bf11c207be4030c5",
+              "image": "quantafs:stage3",
+              "imageID": "docker-pullable://quantafs@sha256:7471a5bdccb77f8553f9c6ca879b35c55032749c1a03af8095d72d8c146c8ac4",
+              "lastState": {},
+              "name": "client",
+              "ready": true,
+              "resources": {
+                "limits": {
+                  "cpu": "250m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "25m",
+                  "memory": "64Mi"
+                }
+              },
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-10-20T07:00:58Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/lib/quantafs-client",
+                  "name": "client-session"
+                },
+                {
+                  "mountPath": "/tmp",
+                  "name": "tmp"
+                }
+              ]
+            }
+          ],
+          "hostIP": "192.168.65.3",
+          "hostIPs": [
+            {
+              "ip": "192.168.65.3"
+            }
+          ],
+          "observedGeneration": 1,
+          "phase": "Running",
+          "podIP": "10.1.0.7",
+          "podIPs": [
+            {
+              "ip": "10.1.0.7"
+            }
+          ],
+          "qosClass": "Burstable",
+          "resources": {
+            "limits": {
+              "cpu": "250m",
+              "memory": "256Mi"
+            },
+            "requests": {
+              "memory": "64Mi"
+            }
+          },
+          "startTime": "2026-10-20T07:00:54Z"
+        }
+      }
+    ],
+    "kind": "List",
+    "metadata": {
+      "resourceVersion": ""
+    }
+  },
+  "workload": "closed-loop 50% PUT / 50% barrier GET; persistent channels; unique client per worker; no CLI journal fsync",
+  "value_bytes": 512,
+  "warmup_per_worker": 100,
+  "measured_operations_per_trial": 1000,
+  "trials_per_concurrency": 3,
+  "concurrency": [
+    1,
+    4
+  ]
+}

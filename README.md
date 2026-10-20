@@ -7,8 +7,20 @@ QuantaFs is a distributed key-value storage engine being built in Java with Raft
 **Status: the local cluster now includes automatic leader discovery, journaled retry-safe mutations,
 and snapshots with log-prefix cleanup and lagging-node recovery. These work on top of the durable
 Raft core and real gRPC transport. Stage 1 packages the loopback single-node service; Stage 2 runs
-three nodes on an isolated local Compose network. Kubernetes, TLS/authentication, and remote-host
-setup are not included.**
+three nodes on an isolated local Compose network. Stage 3 now provides local Docker Desktop
+Kubernetes StatefulSet deployment, verified on a local Docker Desktop cluster.
+TLS/authentication and remote-host setup are not included.**
+
+## Review the project
+
+- **See recovery:** [interview demo](docs/demo.md), including the repeatable Kubernetes failure script.
+- **Inspect measurements:** [benchmark method and results](docs/benchmarks.md), with raw latency samples.
+- **Understand the guarantees:** [retry sessions and snapshots](docs/retries-and-snapshots.md).
+- **Run it yourself:** [Docker Compose](docs/compose-walkthrough.md) or [local Kubernetes](docs/kubernetes-walkthrough.md).
+
+The system uses fixed membership and a single replication group. The local Kubernetes deployment
+runs three voters on one machine; five-voter behavior is covered by process tests. TLS, authentication,
+dynamic membership, and multi-host production validation remain unfinished.
 
 ## Implemented today vs. planned
 
@@ -20,8 +32,8 @@ setup are not included.**
 | **M1:** Graceful shutdown, demo CLI, gRPC tests, restart and process-level SIGKILL recovery tests | Chunked snapshots for images larger than 8 MiB |
 | **M2A:** Raft leader election: roles, terms, randomized timeouts, `RequestVote`, majority voting, heartbeats | Streaming snapshots and large-dataset tuning |
 | **M2B:** Durable term-tagged log (`PUT`, `DELETE`, `NO_OP`); full `AppendEntries` with log matching, `nextIndex`/`matchIndex`, catch-up, conflict repair | PreVote, leadership transfer, membership changes |
-| **M2B:** Majority commitment restricted to current-term entries (leader `NO_OP`; Figure 8 tested) | Kubernetes manifests |
-| **M2B:** Term, vote, and log in one atomic synced RocksDB write; OS-locked node directories; corruption refuses startup | Power-loss fault injection, benchmarks |
+| **M2B:** Majority commitment restricted to current-term entries (leader `NO_OP`; Figure 8 tested) | Multi-host deployment validation |
+| **M2B:** Term, vote, and log in one atomic synced RocksDB write; OS-locked node directories; corruption refuses startup | Power-loss fault injection, sustained capacity benchmarks |
 | **M2B:** RocksDB state machine with atomic data + `lastApplied` marker; strict in-order apply; `commitIndex` relearned after restart | |
 | **M2B:** Internal proposal API: success only after majority commit and local apply; `UNKNOWN` if interrupted | |
 | **M2:** Deterministic simulator (delay, reorder, duplicate, drop, partition, crash, restart, injected storage/apply failures) checking election safety, log matching, committed agreement, ordered apply, and convergence | |
@@ -32,6 +44,7 @@ setup are not included.**
 | **M5:** Checksummed snapshots include data and sessions; compacted-prefix recovery and snapshot transfer | |
 | **Deployment Stage 1:** Multi-stage Java 21 image for the loopback single-node service; non-root runtime and explicit persistent data mount | |
 | **Deployment Stage 2:** Three-node Compose cluster; stable DNS membership, private internal network, separate node volumes, non-root client failover demo | |
+| **Deployment Stage 3:** Local-only Namespace, headless Service, three-voter StatefulSet/PVCs, probes, non-root client tool, and strict context guard; local runtime validated | |
 | GitHub Actions workflow configured for all tests (hosted execution was blocked by an account billing lock) | |
 
 Design, exact semantics, durability policy, and test limits:
@@ -42,6 +55,7 @@ Design, exact semantics, durability policy, and test limits:
 - Milestones 4–5: [docs/retries-and-snapshots.md](docs/retries-and-snapshots.md)
 - Deployment Stage 1: [docs/container-walkthrough.md](docs/container-walkthrough.md)
 - Deployment Stage 2: [docs/compose-walkthrough.md](docs/compose-walkthrough.md)
+- Deployment Stage 3: [docs/kubernetes-walkthrough.md](docs/kubernetes-walkthrough.md)
 
 ## Try the real cluster
 
@@ -65,6 +79,10 @@ docker compose up --detach --wait --wait-timeout 60
 
 No ports are published to the host. See the [Compose walkthrough](docs/compose-walkthrough.md) for
 leader discovery, retry-client, failover, recovery, security-boundary, and safe cleanup commands.
+
+Local Kubernetes resources are under `deploy/kubernetes`. Three voters and their separate PVCs
+have been started on Docker Desktop Kubernetes. Follow the
+[Kubernetes walkthrough](docs/kubernetes-walkthrough.md), including its strict local-context check.
 
 ## Quickstart (single node)
 
@@ -174,7 +192,8 @@ Application / test client
 - **Raft:** leader election, ordered log replication, and safe commitment.
 - **RocksDB:** persistent local key-value state, and (since 2B) a separate per-node database for durable Raft metadata and log with an explicit recovery contract.
 - **Docker:** local single-node and three-node Compose packaging with stable identities and persistent volumes.
-- **Kubernetes:** planned local orchestration; no manifests are implemented yet.
+- **Kubernetes:** local Docker Desktop StatefulSet, stable peer DNS, separate persistent claims,
+  bounded probes, and non-root client workflow; local runtime validated.
 
 ## Target guarantees
 
@@ -194,7 +213,7 @@ Scope starts with one replication group and fixed membership. Sharding, multi-ke
 
 - [x] Single-node Java service with gRPC Put, Get, and Delete.
 - [x] RocksDB persistence with restart and durability tests (process-crash level; power-loss testing is part of the fault-injection item).
-- [x] Deterministic Raft core with election and replication tests (in-process simulation; no network transport yet).
+- [x] Deterministic Raft core with election and replication tests (the core is independently tested in simulation).
   - [x] 2A: leader election, heartbeats, and durable term/vote, with deterministic simulation tests ([docs/raft-election.md](docs/raft-election.md)).
   - [x] 2B: durable log replication, commitment, and ordered state-machine application ([docs/raft-replication.md](docs/raft-replication.md)).
 - [x] Local three-/five-process gRPC cluster with durable consensus state, recovery, and barrier reads.
@@ -202,10 +221,12 @@ Scope starts with one replication group and fixed membership. Sharding, multi-ke
 - [x] Snapshotting, logical log-prefix cleanup, and lagging-node recovery (8 MiB single-image limit).
 - [x] Stage 1 single-node Docker image with a non-root runtime and persistent data mount.
 - [x] Stage 2 local-only network boundary and three-node Docker Compose deployment.
-- [ ] Stage 3 local Kubernetes StatefulSet, headless Service, configuration, probes, and persistent volume claims.
-- [ ] Stage 4 Kubernetes-orchestrated failure and recovery demonstration.
+- [x] Stage 3 local Kubernetes manifests, strict context guard, probes, and persistent claims
+  (server validated and run locally).
+- [x] Stage 4 local Kubernetes Pod replacement, PVC reuse, majority-loss refusal, and recovery demo.
 - [ ] Five-node deployment with persistent storage.
-- [ ] Fault-injection suite and reproducible benchmark reports.
+- [x] Initial reproducible local benchmark report with raw samples and explicit workload limits.
+- [ ] Broader fault-injection and sustained capacity characterization.
 
 ## Validation strategy
 
@@ -213,7 +234,10 @@ Correctness comes before throughput. Tests will exercise leader termination, fol
 
 Benchmark reports will include hardware, software versions, payload sizes, concurrency, read/write mix, disk synchronization settings, throughput, latency percentiles, error rates, and recovery-time definitions.
 
-**No performance or failover numbers are claimed yet. Results will be published with commands and raw evidence once measured.**
+**Initial local measurements:** 6,000 operations completed across six trials with zero observed errors.
+Median trial throughput was 135.7 ops/s with one client and 130.1 ops/s with four clients in the
+resource-limited local Kubernetes setup. See the [full method, latency results, variation, and raw evidence](docs/benchmarks.md).
+These are workload-specific observations; no production capacity or failover-time guarantee is claimed.
 
 ## First milestone (complete)
 

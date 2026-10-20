@@ -189,9 +189,10 @@ docker volume rm quantafs-stage1-data
 
 - Stage 2 now adds three-node Compose networking, separate node identities, and separate volumes
   without changing this image's safe single-node default. See [the Compose walkthrough](compose-walkthrough.md).
-- Stage 3 will add and explain local Kubernetes resources: StatefulSet, headless Service, persistent
-  volume claims, configuration, and probes.
-- Stage 4 will demonstrate controlled failure and recovery.
+- Stage 3 now provides local Kubernetes resources: StatefulSet, headless Service, persistent volume
+  claims, configuration, and probes. The deployment and recovery demo have been verified locally; see
+  [the Kubernetes walkthrough](kubernetes-walkthrough.md).
+- Stage 4 now demonstrates controlled Pod replacement, majority-loss refusal, and recovery.
 
 Stage 2 is activated only by Compose commands and explicit network-mode arguments; this Stage 1
 default command remains the loopback single-node server.
