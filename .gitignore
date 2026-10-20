@@ -35,3 +35,6 @@ secrets*
 *.session
 *.session.lock
 *.session.tmp
+
+# Video renderer review frames; final media is versioned separately.
+docs/media/chapter-*.png

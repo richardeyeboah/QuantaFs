@@ -1,0 +1,4 @@
+Replacing leader quantafs-2; Pod UID=94f1b116-508d-453e-a7a1-37f88ebf5ec0; volume=pvc-905e0446-3a4c-4079-8539-c6901f90352d
+PASS: replacement Pod reused the same PVC and data remained readable
+PASS: minority refused the read without halting
+PASS: majority restored, all nodes caught up, original data readable; cluster remains running

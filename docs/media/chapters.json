@@ -1,0 +1,40 @@
+{
+  "duration_seconds": 70,
+  "fps": 20,
+  "editing": "Captioned replay of captured command results; real waits shortened; no audio.",
+  "capture": "demo-evidence/trace.json",
+  "chapters": [
+    {
+      "title": "intro",
+      "seconds": 7
+    },
+    {
+      "title": "Write. Replicate. Acknowledge.",
+      "seconds": 9
+    },
+    {
+      "title": "Now remove the elected leader.",
+      "seconds": 8
+    },
+    {
+      "title": "The client keeps working.",
+      "seconds": 8
+    },
+    {
+      "title": "A new Pod. The same storage.",
+      "seconds": 10
+    },
+    {
+      "title": "No majority? Refuse the read.",
+      "seconds": 10
+    },
+    {
+      "title": "Restore the voters. Read the data.",
+      "seconds": 10
+    },
+    {
+      "title": "outro",
+      "seconds": 8
+    }
+  ]
+}

@@ -1,5 +1,8 @@
 # Demonstrating QuantaFs in an interview
 
+[Watch the captioned 70-second demo](https://github.com/user-attachments/assets/09bb0814-8f3d-41e4-a314-b02a347fb36b).
+It is an edited replay of a real captured local run; waits are shortened.
+
 ## Start with the problem
 
 “I built a distributed key-value store in Java. The challenge is keeping acknowledged data

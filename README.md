@@ -1,15 +1,22 @@
 # QuantaFs
 
-### Fault-tolerant storage. Explicit guarantees. Reproducible failure tests.
+### Save data. Lose a server. Keep the data.
 
-QuantaFs is a distributed key-value storage engine being built in Java with Raft consensus, gRPC, and RocksDB. The goal is to keep acknowledged writes durable and the cluster consistent through server crashes and network partitions.
+A distributed key-value store built in **Java** with **Raft consensus, gRPC, and RocksDB**.
+Writes succeed after majority commitment and local application. Retry-safe sequential sessions,
+snapshots, and persistent recovery handle the failures around that promise.
 
-**Status: the local cluster now includes automatic leader discovery, journaled retry-safe mutations,
-and snapshots with log-prefix cleanup and lagging-node recovery. These work on top of the durable
-Raft core and real gRPC transport. Stage 1 packages the loopback single-node service; Stage 2 runs
-three nodes on an isolated local Compose network. Stage 3 now provides local Docker Desktop
-Kubernetes StatefulSet deployment, verified on a local Docker Desktop cluster.
-TLS/authentication and remote-host setup are not included.**
+https://github.com/user-attachments/assets/09bb0814-8f3d-41e4-a314-b02a347fb36b
+
+**[Watch the 70-second demo](https://github.com/user-attachments/assets/09bb0814-8f3d-41e4-a314-b02a347fb36b)** ·
+[Run the same recovery test](docs/demo.md) ·
+[Inspect the captured evidence](docs/media/demo-evidence/trace.json)
+
+*Captioned, edited replay of a real local Kubernetes run. Waits are shortened; this is not a
+failover-time measurement. The three voters run on one host.*
+
+**Verified:** 526 automated tests passed. The live demo checks leader Pod replacement, reuse of the
+same persistent volume, majority-loss read refusal, and recovery with the original data intact.
 
 ## Review the project
 
