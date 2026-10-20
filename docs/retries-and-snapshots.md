@@ -1,7 +1,9 @@
 # Leader discovery, safe retries, snapshots, and log cleanup
 
-These are the last two implementation phases before deployment. They run locally; no containers,
-Kubernetes resources, remote servers, or paid infrastructure are created.
+These were the last two implementation phases before deployment. They run locally and did not add
+containers, Kubernetes resources, remote servers, or paid infrastructure. A later Stage 1 image
+packages the loopback single-node service, and Stage 2 packages the existing cluster in local
+Compose; see the [container](container-walkthrough.md) and [Compose](compose-walkthrough.md) walkthroughs.
 
 ## Watch the new behavior
 
@@ -117,8 +119,8 @@ snapshot creation after a 30-second cooldown, allowing a reduced dataset to fit 
 silently discard data to satisfy the limit. Chunked/streaming snapshots and multi-gigabyte datasets
 are outside this version. Dataset/session metadata growth still needs operational monitoring.
 
-Transport is loopback-only and unauthenticated. No deployment, TLS, Kubernetes, external fault
-infrastructure, disk-power-loss proof, or benchmark claim is added in these phases.
+Transport is loopback-only and unauthenticated. These phases add no deployment, TLS, Kubernetes,
+external fault infrastructure, disk-power-loss proof, or benchmark claim.
 
 ## Local validation
 
@@ -137,4 +139,5 @@ stale/gapped sequences, journal restart/locking/corruption, snapshot preservatio
 compacted-log reopen, corruption rejection, interrupted snapshot application, and an offline
 follower installing an image after the missing prefix has been deleted. Real three- and five-process
 checks combine automatic client failover, snapshot catch-up, majority loss, and full-cluster restart.
-These are local tests. Deployment is the next user-controlled phase.
+These are local tests. The later container stages do not add TLS, authentication, remote-host, or
+power-loss guarantees.

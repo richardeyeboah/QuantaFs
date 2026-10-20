@@ -133,11 +133,16 @@ performance benchmarks.
 
 ## Remaining scope
 
-Only loopback addresses are accepted: there is no TLS, authenticated peer identity, or client access
-control. The membership key prevents accidental configuration mixing; it is not an authentication
-secret. Do not expose these ports through forwarding or deploy this mode on an untrusted machine.
+Loopback remains the default and is the only mode described by this milestone. Deployment Stage 2
+adds a separate, explicit `compose` mode restricted to stable service DNS names on an internal local
+Docker network; see `compose-walkthrough.md`. Neither mode has TLS, authenticated peer identity, or
+client access control. The membership key prevents accidental configuration mixing; it is not an
+authentication secret. Do not expose these ports through forwarding or deploy either mode on an
+untrusted machine.
 
 At the original milestone-3 checkpoint there were no automatic client retries or snapshots; those
 are now implemented as described in `retries-and-snapshots.md`. Live membership changes,
 remote hosts, Kubernetes deployment, systematic real-network partition injection, disk/power-loss
-fault tests, or throughput/latency claims are included. Snapshot limits and resource admission bounds still require monitoring; this is not a production-ready service.
+fault tests, and throughput/latency claims are excluded. Stage 1 packages the separate loopback
+single-node mode and Stage 2 packages a local three-node Compose demo. Snapshot limits and resource
+admission bounds still require monitoring; this is not a production-ready service.

@@ -32,8 +32,23 @@ class WireCodecTest {
                 "n3=127.0.0.1:5103,n1=127.0.0.1:5101,n2=127.0.0.1:5102","--data-dir","./n1-data"});
         assertEquals(5101,s.ports().get(NodeId.of("n1")));
         assertEquals("n1=5101,n2=5102,n3=5103",s.clusterKey());
+        assertEquals("127.0.0.1",s.bindHost());
+        var compose=ClusterSettings.parse(new String[]{"--id","n1","--peers",
+                "n3=n3:7000,n1=n1:7000,n2=n2:7000","--data-dir","./n1-data",
+                "--network-mode","compose"});
+        assertEquals("0.0.0.0",compose.bindHost());
+        assertEquals("n1:7000",compose.localEndpoint().authority());
+        assertEquals("n1=n1:7000,n2=n2:7000,n3=n3:7000",compose.clusterKey());
         assertThrows(IllegalArgumentException.class,() -> ClusterSettings.parse(new String[]{"--id","n1","--peers",
                 "n1=0.0.0.0:5101","--data-dir","./n1-data"}));
+        assertThrows(IllegalArgumentException.class,() -> ClusterSettings.parse(new String[]{"--id","n1","--peers",
+                "n1=n1:7000,n2=n2:7000,n3=n3:7000","--data-dir","./n1-data"}));
+        assertThrows(IllegalArgumentException.class,() -> ClusterSettings.parse(new String[]{"--id","n1","--peers",
+                "n1=127.0.0.1:7000,n2=127.0.0.1:7001,n3=127.0.0.1:7002","--data-dir","./n1-data",
+                "--network-mode","compose"}));
+        assertThrows(IllegalArgumentException.class,() -> ClusterSettings.parse(new String[]{"--id","n1","--peers",
+                "n1=n2:7000,n2=n1:7000,n3=n3:7000","--data-dir","./n1-data",
+                "--network-mode","compose"}));
         assertThrows(IllegalArgumentException.class,() -> new ClusterSettings(NodeId.of("n1"),
                 new TreeMap<>(Map.of(NodeId.of("n1"),1,NodeId.of("n2"),1,NodeId.of("n3"),3)),Path.of("x")));
     }

@@ -14,9 +14,13 @@ public final class ClusterClient implements AutoCloseable {
     private int cursor;
     private String membership;
     public ClusterClient(List<Integer> ports,Duration budget) {
-        if(ports.isEmpty() || budget.isNegative() || budget.isZero()) throw new IllegalArgumentException("seeds and positive timeout required");
+        this(ports.stream().map(NetworkEndpoint::loopback).toList(),budget);
+    }
+    public ClusterClient(Collection<NetworkEndpoint> seeds,Duration budget) {
+        if(seeds.isEmpty() || budget.isNegative() || budget.isZero()) throw new IllegalArgumentException("seeds and positive timeout required");
         budgetNanos=budget.toNanos();
-        channels=ports.stream().map(p -> ManagedChannelBuilder.forAddress("127.0.0.1",p).usePlaintext().build()).toList();
+        channels=seeds.stream().map(endpoint -> ManagedChannelBuilder
+                .forAddress(endpoint.host(),endpoint.port()).usePlaintext().build()).toList();
     }
     private synchronized <T> T execute(Function<KeyValueServiceGrpc.KeyValueServiceBlockingStub,T> call) {
         long end=System.nanoTime()+budgetNanos;

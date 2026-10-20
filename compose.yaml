@@ -1,0 +1,100 @@
+name: quantafs-stage2
+
+x-quantafs-node: &quantafs-node
+  build:
+    context: .
+  image: quantafs:stage2
+  stop_grace_period: 40s
+  networks:
+    - raft-internal
+  healthcheck:
+    test:
+      - CMD
+      - java
+      - -jar
+      - /opt/quantafs/quantafs.jar
+      - cluster-status
+      - --target
+      - 127.0.0.1:7000
+    interval: 5s
+    timeout: 3s
+    retries: 5
+    start_period: 10s
+
+services:
+  n1:
+    <<: *quantafs-node
+    command:
+      - cluster-server
+      - --id
+      - n1
+      - --peers
+      - n1=n1:7000,n2=n2:7000,n3=n3:7000
+      - --data-dir
+      - /var/lib/quantafs
+      - --network-mode
+      - compose
+    volumes:
+      - n1-data:/var/lib/quantafs
+
+  n2:
+    <<: *quantafs-node
+    command:
+      - cluster-server
+      - --id
+      - n2
+      - --peers
+      - n1=n1:7000,n2=n2:7000,n3=n3:7000
+      - --data-dir
+      - /var/lib/quantafs
+      - --network-mode
+      - compose
+    volumes:
+      - n2-data:/var/lib/quantafs
+
+  n3:
+    <<: *quantafs-node
+    command:
+      - cluster-server
+      - --id
+      - n3
+      - --peers
+      - n1=n1:7000,n2=n2:7000,n3=n3:7000
+      - --data-dir
+      - /var/lib/quantafs
+      - --network-mode
+      - compose
+    volumes:
+      - n3-data:/var/lib/quantafs
+
+  client:
+    image: quantafs:stage2
+    profiles:
+      - tools
+    networks:
+      - raft-internal
+    depends_on:
+      n1:
+        condition: service_healthy
+      n2:
+        condition: service_healthy
+      n3:
+        condition: service_healthy
+    volumes:
+      - client-session:/var/lib/quantafs-client
+    command:
+      - --help
+
+networks:
+  raft-internal:
+    internal: true
+
+volumes:
+  n1-data:
+    name: quantafs-compose-n1-data
+  n2-data:
+    name: quantafs-compose-n2-data
+  n3-data:
+    name: quantafs-compose-n3-data
+  client-session:
+    name: quantafs-compose-client-session

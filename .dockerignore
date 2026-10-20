@@ -1,0 +1,40 @@
+# Version-control and editor state
+.git/
+.github/
+.idea/
+.vscode/
+.ide-build/
+.classpath
+.project
+.settings/
+.factorypath
+*.iml
+.DS_Store
+
+# Host build output; the image builds its own JAR
+target/
+
+# Local databases, logs, client journals, and credentials must not enter the build context
+data/
+*-data/
+*.rocksdb/
+*.log
+*.session
+*.session.lock
+*.session.tmp
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+credentials*
+secrets*
+
+# Files not needed to compile the runtime image
+docs/
+scripts/
+src/test/
+README.md
+mvnw.cmd

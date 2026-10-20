@@ -18,7 +18,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.function.Supplier;
 
-/** Real loopback gRPC transport around the single-threaded, durable consensus core. */
+/** Real local-demo gRPC transport around the single-threaded, durable consensus core. */
 public final class ClusterServer implements AutoCloseable {
     private static final int MAX_PENDING=128, MAX_INFLIGHT_PER_PEER=2;
     private static final long REQUEST_TIMEOUT_SECONDS=5;
@@ -79,17 +79,17 @@ public final class ClusterServer implements AutoCloseable {
         }
         storage=RocksDbRaftStorage.open(settings.directory().resolve("raft-log"));
         machine=RocksDbStateMachine.open(settings.directory().resolve("state-machine"));
-        node=new RaftNode(settings.id(),ClusterConfig.of(settings.ports().keySet()),ElectionTiming.DEFAULT,
+        node=new RaftNode(settings.id(),ClusterConfig.of(settings.peers().keySet()),ElectionTiming.DEFAULT,
                 new SeededRandomSource(ThreadLocalRandom.current().nextLong()),storage,machine);
-        for(NodeId peer:settings.ports().keySet()) {
-            if (!peer.equals(settings.id())) {
-                inFlight.put(peer,new AtomicInteger());
-                channels.put(peer,ManagedChannelBuilder
-                    .forAddress("127.0.0.1",settings.ports().get(peer)).usePlaintext()
+        for(var peer:settings.peers().entrySet()) {
+            if (!peer.getKey().equals(settings.id())) {
+                inFlight.put(peer.getKey(),new AtomicInteger());
+                channels.put(peer.getKey(),ManagedChannelBuilder
+                    .forAddress(peer.getValue().host(),peer.getValue().port()).usePlaintext()
                     .maxInboundMessageSize(20*1024*1024).build());
             }
         }
-        server=NettyServerBuilder.forAddress(new InetSocketAddress("127.0.0.1",settings.ports().get(settings.id())))
+        server=NettyServerBuilder.forAddress(new InetSocketAddress(settings.bindHost(),settings.localEndpoint().port()))
                 .executor(rpcExecutor).maxInboundMessageSize(20*1024*1024)
                 .addService(new Transport()).addService(new KeyValues()).build().start();
         clock.scheduleWithFixedDelay(() -> {
@@ -100,8 +100,8 @@ public final class ClusterServer implements AutoCloseable {
                 })) tickQueued.set(false);
             }
         },50,50,TimeUnit.MILLISECONDS);
-        System.out.println("QuantaFs cluster node "+settings.id()+" listening on 127.0.0.1:"
-                +settings.ports().get(settings.id()));
+        System.out.println("QuantaFs cluster node "+settings.id()+" listening on "+settings.bindHost()+":"
+                +settings.localEndpoint().port()+" (advertised as "+settings.localEndpoint().authority()+")");
     }
     private boolean enqueue(Runnable action) {
         if (closing) return false;
@@ -215,7 +215,7 @@ public final class ClusterServer implements AutoCloseable {
             RaftMessage message;
             try {
                 message=WireCodec.decode(envelope);
-                if(!settings.id().equals(message.to()) || !settings.ports().containsKey(message.from()))
+                if(!settings.id().equals(message.to()) || !settings.peers().containsKey(message.from()))
                     throw new IllegalArgumentException("invalid sender or receiver");
             } catch(IllegalArgumentException e) { error(response,Status.INVALID_ARGUMENT.withDescription(e.getMessage())); return; }
             if(!enqueue(() -> { if(!fatal) send(node.receive(message)); })) {

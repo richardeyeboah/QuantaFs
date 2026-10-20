@@ -6,8 +6,9 @@ QuantaFs is a distributed key-value storage engine being built in Java with Raft
 
 **Status: the local cluster now includes automatic leader discovery, journaled retry-safe mutations,
 and snapshots with log-prefix cleanup and lagging-node recovery. These work on top of the durable
-Raft core and real gRPC transport. Deployment has deliberately not started: no Docker/Kubernetes
-or remote-host setup is included.**
+Raft core and real gRPC transport. Stage 1 packages the loopback single-node service; Stage 2 runs
+three nodes on an isolated local Compose network. Kubernetes, TLS/authentication, and remote-host
+setup are not included.**
 
 ## Implemented today vs. planned
 
@@ -19,7 +20,7 @@ or remote-host setup is included.**
 | **M1:** Graceful shutdown, demo CLI, gRPC tests, restart and process-level SIGKILL recovery tests | Chunked snapshots for images larger than 8 MiB |
 | **M2A:** Raft leader election: roles, terms, randomized timeouts, `RequestVote`, majority voting, heartbeats | Streaming snapshots and large-dataset tuning |
 | **M2B:** Durable term-tagged log (`PUT`, `DELETE`, `NO_OP`); full `AppendEntries` with log matching, `nextIndex`/`matchIndex`, catch-up, conflict repair | PreVote, leadership transfer, membership changes |
-| **M2B:** Majority commitment restricted to current-term entries (leader `NO_OP`; Figure 8 tested) | Docker images, Kubernetes manifests |
+| **M2B:** Majority commitment restricted to current-term entries (leader `NO_OP`; Figure 8 tested) | Kubernetes manifests |
 | **M2B:** Term, vote, and log in one atomic synced RocksDB write; OS-locked node directories; corruption refuses startup | Power-loss fault injection, benchmarks |
 | **M2B:** RocksDB state machine with atomic data + `lastApplied` marker; strict in-order apply; `commitIndex` relearned after restart | |
 | **M2B:** Internal proposal API: success only after majority commit and local apply; `UNKNOWN` if interrupted | |
@@ -29,6 +30,8 @@ or remote-host setup is included.**
 | **M3:** Three-/five-process failure and recovery tests; fixed identities and node directory ownership | |
 | **M4:** Automatic leader discovery, durable client journals, and replicated sequential-session deduplication | |
 | **M5:** Checksummed snapshots include data and sessions; compacted-prefix recovery and snapshot transfer | |
+| **Deployment Stage 1:** Multi-stage Java 21 image for the loopback single-node service; non-root runtime and explicit persistent data mount | |
+| **Deployment Stage 2:** Three-node Compose cluster; stable DNS membership, private internal network, separate node volumes, non-root client failover demo | |
 | GitHub Actions workflow configured for all tests (hosted execution was blocked by an account billing lock) | |
 
 Design, exact semantics, durability policy, and test limits:
@@ -37,6 +40,8 @@ Design, exact semantics, durability policy, and test limits:
 - Milestone 2B: [docs/raft-replication.md](docs/raft-replication.md)
 - Milestone 3: [docs/network-cluster.md](docs/network-cluster.md)
 - Milestones 4–5: [docs/retries-and-snapshots.md](docs/retries-and-snapshots.md)
+- Deployment Stage 1: [docs/container-walkthrough.md](docs/container-walkthrough.md)
+- Deployment Stage 2: [docs/compose-walkthrough.md](docs/compose-walkthrough.md)
 
 ## Try the real cluster
 
@@ -50,6 +55,16 @@ reads the confirmed order from the replacement, and restarts the old node to dem
 Use `--nodes 5` for five processes. It owns only temporary storage and cleans up its processes.
 See [the network cluster walkthrough](docs/network-cluster.md) for manual commands, architecture,
 read guarantees, test evidence, and limitations.
+
+To run the same three-voter runtime in isolated local containers:
+
+```bash
+docker compose build
+docker compose up --detach --wait --wait-timeout 60
+```
+
+No ports are published to the host. See the [Compose walkthrough](docs/compose-walkthrough.md) for
+leader discovery, retry-client, failover, recovery, security-boundary, and safe cleanup commands.
 
 ## Quickstart (single node)
 
@@ -158,7 +173,8 @@ Application / test client
 - **gRPC + Protocol Buffers:** typed client APIs and inter-node communication.
 - **Raft:** leader election, ordered log replication, and safe commitment.
 - **RocksDB:** persistent local key-value state, and (since 2B) a separate per-node database for durable Raft metadata and log with an explicit recovery contract.
-- **Docker + Kubernetes:** reproducible deployment with stable node identities and persistent volumes.
+- **Docker:** local single-node and three-node Compose packaging with stable identities and persistent volumes.
+- **Kubernetes:** planned local orchestration; no manifests are implemented yet.
 
 ## Target guarantees
 
@@ -184,6 +200,10 @@ Scope starts with one replication group and fixed membership. Sharding, multi-ke
 - [x] Local three-/five-process gRPC cluster with durable consensus state, recovery, and barrier reads.
 - [x] Correct reads, automatic leader discovery, and retry deduplication (sequential client-session contract).
 - [x] Snapshotting, logical log-prefix cleanup, and lagging-node recovery (8 MiB single-image limit).
+- [x] Stage 1 single-node Docker image with a non-root runtime and persistent data mount.
+- [x] Stage 2 local-only network boundary and three-node Docker Compose deployment.
+- [ ] Stage 3 local Kubernetes StatefulSet, headless Service, configuration, probes, and persistent volume claims.
+- [ ] Stage 4 Kubernetes-orchestrated failure and recovery demonstration.
 - [ ] Five-node deployment with persistent storage.
 - [ ] Fault-injection suite and reproducible benchmark reports.
 

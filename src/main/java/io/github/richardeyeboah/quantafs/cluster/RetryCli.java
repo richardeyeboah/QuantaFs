@@ -6,26 +6,43 @@ import java.time.Duration;
 import java.util.*;
 
 public final class RetryCli {
+    private static final String USAGE =
+            """
+            cluster-client [--network-mode loopback|compose] \
+              --seeds 127.0.0.1:5101,127.0.0.1:5102,127.0.0.1:5103 \
+              --session ./checkout.session <put key value|get key|delete key|resume>
+            """;
+
     private RetryCli() {}
     public static int run(String[] args) {
-        if(args.length<5 || !args[0].equals("--seeds") || !args[2].equals("--session")) {
-            System.err.println("cluster-client --seeds 127.0.0.1:5101,127.0.0.1:5102,127.0.0.1:5103 --session ./checkout.session <put key value|get key|delete key|resume>");return 2;
-        }
         try {
-            List<Integer> ports=Arrays.stream(args[1].split(",")).map(seed -> {
-                if(!seed.matches("127\\.0\\.0\\.1:[0-9]+")) throw new IllegalArgumentException("loopback seeds required");
-                int port=Integer.parseInt(seed.substring(10));if(port<1||port>65535) throw new IllegalArgumentException("invalid port");return port;
-            }).toList();
-            try(var journal=new ClientJournal(Path.of(args[3]));var client=new ClusterClient(ports,Duration.ofSeconds(20))) {
-                if(args[4].equals("get") && args.length==6) {
-                    var result=client.get(GetRequest.newBuilder().setKey(ByteString.copyFromUtf8(args[5])).build());
+            int offset=0;
+            ClusterSettings.NetworkMode mode=ClusterSettings.NetworkMode.LOOPBACK;
+            if(args.length>=2 && args[0].equals("--network-mode")) {
+                mode=switch(args[1]) {
+                    case "loopback" -> ClusterSettings.NetworkMode.LOOPBACK;
+                    case "compose" -> ClusterSettings.NetworkMode.COMPOSE;
+                    default -> throw new IllegalArgumentException("--network-mode must be loopback or compose");
+                };
+                offset=2;
+            }
+            if(args.length<offset+5 || !args[offset].equals("--seeds") || !args[offset+2].equals("--session")) {
+                System.err.print(USAGE);return 2;
+            }
+            List<NetworkEndpoint> seeds=parseSeeds(args[offset+1],mode);
+            int command=offset+4;
+            try(var journal=new ClientJournal(Path.of(args[offset+3]));var client=new ClusterClient(seeds,Duration.ofSeconds(20))) {
+                if(args[command].equals("get") && args.length==command+2) {
+                    var result=client.get(GetRequest.newBuilder().setKey(ByteString.copyFromUtf8(args[command+1])).build());
                     System.out.println(result.getFound()?result.getValue().toStringUtf8():"NOT FOUND");return result.getFound()?0:1;
                 }
                 ClientJournal.Mutation operation;
-                if(args[4].equals("resume") && args.length==5) {
+                if(args[command].equals("resume") && args.length==command+1) {
                     operation=journal.pending();if(operation==null) throw new IllegalArgumentException("no unresolved mutation");
-                } else if(args[4].equals("put") && args.length==7) operation=new ClientJournal.Mutation("put",args[5],args[6]);
-                else if(args[4].equals("delete") && args.length==6) operation=new ClientJournal.Mutation("delete",args[5],"");
+                } else if(args[command].equals("put") && args.length==command+3)
+                    operation=new ClientJournal.Mutation("put",args[command+1],args[command+2]);
+                else if(args[command].equals("delete") && args.length==command+2)
+                    operation=new ClientJournal.Mutation("delete",args[command+1],"");
                 else throw new IllegalArgumentException("invalid command/arguments");
                 journal.prepare(operation);
                 if(operation.kind().equals("put")) client.put(PutRequest.newBuilder().setClientId(journal.clientId())
@@ -36,5 +53,21 @@ public final class RetryCli {
                 journal.confirmed();System.out.println("OK");return 0;
             }
         } catch(Exception e) {System.err.println("error: "+e.getMessage());return 3;}
+    }
+
+    static List<NetworkEndpoint> parseSeeds(
+            String text, ClusterSettings.NetworkMode mode) {
+        List<NetworkEndpoint> seeds=Arrays.stream(text.split(",",-1))
+                .map(NetworkEndpoint::parse).toList();
+        if(seeds.isEmpty() || new HashSet<>(seeds).size()!=seeds.size())
+            throw new IllegalArgumentException("seed endpoints must be non-empty and unique");
+        for(NetworkEndpoint seed:seeds) {
+            if(mode==ClusterSettings.NetworkMode.LOOPBACK && !seed.host().equals("127.0.0.1"))
+                throw new IllegalArgumentException("loopback seeds required unless --network-mode compose is explicit");
+            if(mode==ClusterSettings.NetworkMode.COMPOSE
+                    && !seed.host().matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"))
+                throw new IllegalArgumentException("compose seeds must use lowercase service DNS names");
+        }
+        return seeds;
     }
 }

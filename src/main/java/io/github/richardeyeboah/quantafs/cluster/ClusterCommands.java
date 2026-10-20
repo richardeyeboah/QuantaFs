@@ -17,7 +17,7 @@ public final class ClusterCommands {
             System.out.printf("id=%s role=%s term=%d leader=%s commit=%d applied=%d halted=%s pending=%d snapshot=%d retained=%d snapshotLimited=%s%n",
                     s.getId(),s.getRole(),s.getTerm(),s.getLeader(),s.getCommitIndex(),s.getAppliedIndex(),
                     s.getHalted(),s.getPendingRequests(),s.getSnapshotIndex(),s.getRetainedEntries(),s.getSnapshotLimited());
-            return 0;
+            return s.getHalted() ? 3 : 0;
         } catch(StatusRuntimeException e) { System.err.println(e.getStatus()); return 3; }
         finally { channel.shutdownNow(); }
     }
