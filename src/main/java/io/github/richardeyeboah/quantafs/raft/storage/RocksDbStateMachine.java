@@ -1,0 +1,191 @@
+package io.github.richardeyeboah.quantafs.raft.storage;
+
+import io.github.richardeyeboah.quantafs.raft.Bytes;
+import io.github.richardeyeboah.quantafs.raft.Command;
+import io.github.richardeyeboah.quantafs.raft.LogEntry;
+import io.github.richardeyeboah.quantafs.raft.LogPosition;
+import io.github.richardeyeboah.quantafs.raft.StateMachine;
+import io.github.richardeyeboah.quantafs.raft.StateMachineException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.DBOptions;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
+import org.rocksdb.WALRecoveryMode;
+import org.rocksdb.WriteBatch;
+import org.rocksdb.WriteOptions;
+
+/**
+ * RocksDB-backed key-value {@link StateMachine}.
+ *
+ * <p>User data lives in the {@code default} column family; the {@code lastApplied} marker lives in a
+ * separate {@code raft-meta} column family. Column families are separate key spaces inside one
+ * database, so no user key, whatever its bytes, can collide with internal metadata, while one
+ * {@link WriteBatch} can still update both atomically.
+ *
+ * <p>Each apply writes the command's effect (nothing for {@code NO_OP}) and the new marker in one
+ * synced batch. After any crash the database therefore shows exactly the entries up to its marker:
+ * on restart, entries after the marker are applied, and entries up to it never again.
+ */
+public final class RocksDbStateMachine implements StateMachine, AutoCloseable {
+
+    static {
+        RocksDB.loadLibrary();
+    }
+
+    static final byte[] META_COLUMN_FAMILY = "raft-meta".getBytes(StandardCharsets.UTF_8);
+    static final byte[] LAST_APPLIED_KEY = "last-applied".getBytes(StandardCharsets.UTF_8);
+
+    private final Path directory;
+    private final DBOptions options;
+    private final ColumnFamilyOptions columnOptions;
+    private final WriteOptions syncWrites;
+    private final RocksDB db;
+    private final ColumnFamilyHandle data;
+    private final ColumnFamilyHandle meta;
+    private final List<ColumnFamilyHandle> handles;
+    private LogPosition lastApplied; // guarded by this
+    private boolean failed;
+    private boolean closed;
+
+    private RocksDbStateMachine(Path directory, DBOptions options, ColumnFamilyOptions columnOptions,
+            WriteOptions syncWrites, RocksDB db, List<ColumnFamilyHandle> handles) {
+        this.directory = directory;
+        this.options = options;
+        this.columnOptions = columnOptions;
+        this.syncWrites = syncWrites;
+        this.db = db;
+        this.handles = handles;
+        this.data = handles.get(0);
+        this.meta = handles.get(1);
+    }
+
+    /** Opens (creating if needed) the state machine in {@code directory}. */
+    public static RocksDbStateMachine open(Path directory) {
+        Objects.requireNonNull(directory, "directory");
+        Path dir = directory.toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new StateMachineException("cannot create state machine directory " + dir, e);
+        }
+        DBOptions options = new DBOptions();
+        options.setCreateIfMissing(true);
+        options.setCreateMissingColumnFamilies(true);
+        options.setParanoidChecks(true);
+        options.setWalRecoveryMode(WALRecoveryMode.TolerateCorruptedTailRecords);
+        ColumnFamilyOptions columnOptions = new ColumnFamilyOptions();
+        WriteOptions syncWrites = new WriteOptions();
+        syncWrites.setSync(true);
+        List<ColumnFamilyDescriptor> descriptors = List.of(
+                new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnOptions),
+                new ColumnFamilyDescriptor(META_COLUMN_FAMILY, columnOptions));
+        List<ColumnFamilyHandle> handles = new ArrayList<>();
+        RocksDB db;
+        try {
+            db = RocksDB.open(options, dir.toString(), descriptors, handles);
+        } catch (RocksDBException e) {
+            syncWrites.close();
+            columnOptions.close();
+            options.close();
+            throw new StateMachineException("cannot open state machine at " + dir + ": " + e.getMessage(), e);
+        }
+        RocksDbStateMachine machine = new RocksDbStateMachine(dir, options, columnOptions, syncWrites, db, handles);
+        try {
+            byte[] marker = db.get(machine.meta, LAST_APPLIED_KEY);
+            machine.lastApplied = marker == null ? LogPosition.EMPTY : RecordCodec.decodeApplied(marker);
+            return machine;
+        } catch (IOException | IllegalArgumentException e) {
+            machine.close();
+            throw new StateMachineException(
+                    "state machine at " + dir + " is corrupt; refusing to start: " + e.getMessage(), e);
+        } catch (RocksDBException e) {
+            machine.close();
+            throw new StateMachineException("cannot read state machine at " + dir + ": " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public synchronized LogPosition lastApplied() {
+        ensureUsable();
+        return lastApplied;
+    }
+
+    @Override
+    public synchronized void apply(LogEntry entry) {
+        Objects.requireNonNull(entry, "entry");
+        ensureUsable();
+        StateMachine.checkNext(lastApplied, entry);
+        try (WriteBatch batch = new WriteBatch()) {
+            switch (entry.command()) {
+                case Command.Put put -> batch.put(data, put.key().toByteArray(), put.value().toByteArray());
+                case Command.Delete delete -> batch.delete(data, delete.key().toByteArray());
+                case Command.NoOp noOp -> { }
+            }
+            batch.put(meta, LAST_APPLIED_KEY, RecordCodec.encodeApplied(entry.position()));
+            db.write(syncWrites, batch);
+        } catch (RocksDBException e) {
+            failed = true;
+            throw new StateMachineException("failed to apply entry " + entry.index() + ": " + e.getMessage(), e);
+        }
+        lastApplied = entry.position();
+    }
+
+    @Override
+    public synchronized SortedMap<Bytes, Bytes> diagnosticContents() {
+        ensureUsable();
+        TreeMap<Bytes, Bytes> contents = new TreeMap<>();
+        try (RocksIterator it = db.newIterator(data)) {
+            for (it.seekToFirst(); it.isValid(); it.next()) {
+                contents.put(Bytes.copyOf(it.key()), Bytes.copyOf(it.value()));
+            }
+            it.status();
+        } catch (RocksDBException e) {
+            throw new StateMachineException("cannot read state machine: " + e.getMessage(), e);
+        }
+        return Collections.unmodifiableSortedMap(contents);
+    }
+
+    public Path directory() {
+        return directory;
+    }
+
+    @Override
+    public synchronized void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        handles.forEach(ColumnFamilyHandle::close);
+        try {
+            db.closeE();
+        } catch (RocksDBException e) {
+            throw new StateMachineException("failed to close state machine: " + e.getMessage(), e);
+        } finally {
+            syncWrites.close();
+            columnOptions.close();
+            options.close();
+        }
+    }
+
+    private void ensureUsable() {
+        if (closed) {
+            throw new StateMachineException("state machine is closed");
+        }
+        if (failed) {
+            throw new StateMachineException("an earlier apply failed; state is unknown, reopen the state machine");
+        }
+    }
+}

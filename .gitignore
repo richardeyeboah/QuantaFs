@@ -1,5 +1,6 @@
-# Build output
+# Build output (.ide-build/ is the IDE's separate compiler output, see pom.xml)
 target/
+.ide-build/
 
 # Local RocksDB data directories (the README demo uses ./data)
 data/

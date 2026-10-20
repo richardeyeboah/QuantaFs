@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.richardeyeboah.quantafs.raft.InMemoryElectionStateStore;
 import io.github.richardeyeboah.quantafs.raft.NodeId;
+import io.github.richardeyeboah.quantafs.raft.StorageWrite;
 import io.github.richardeyeboah.quantafs.raft.TermAndVote;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +37,7 @@ class ElectionSafetyTest {
         // Tamper with durable state behind the node's back: the invariant check must notice that
         // memory and storage disagree.
         Simulation sim = Simulation.builder("n1", "n2", "n3").seed(1).build();
-        InMemoryElectionStateStore store = sim.store("n1");
-        store.save(TermAndVote.of(50, null));
+        sim.memoryStorage("n1").write(StorageWrite.termAndVote(TermAndVote.of(50, null)));
         assertThrows(IllegalStateException.class, () -> sim.run(5));
     }
 }

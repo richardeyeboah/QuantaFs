@@ -184,6 +184,9 @@
           <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
           <pluginId>grpc-java</pluginId>
           <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+          <!-- Regenerate only when a .proto changed, instead of deleting and rewriting the
+               generated sources on every build while an IDE is watching them. -->
+          <checkStaleness>true</checkStaleness>
         </configuration>
         <executions>
           <execution>
@@ -286,6 +289,8 @@
         <configuration>
           <systemPropertyVariables>
             <quantafs.jar>${quantafs.jar}</quantafs.jar>
+            <!-- Child processes started by integration tests load test-only helper classes from here. -->
+            <quantafs.test-classes>${project.build.testOutputDirectory}</quantafs.test-classes>
           </systemPropertyVariables>
         </configuration>
         <executions>
@@ -308,6 +313,12 @@
       "Unresolved compilation problems" at runtime), and Maven's incremental build could
       package them. Command-line Maven never activates this profile.
     -->
+    <!--
+      The IDE folder lives outside target/ on purpose: `mvn clean` deletes target/, and the IDE's
+      incremental compiler reads unchanged classes back from its output folder instead of
+      recompiling them. With the folder under target/, every clean left the IDE reporting
+      same-package types as unresolved until a full IDE rebuild.
+    -->
     <profile>
       <id>ide-separate-output</id>
       <activation>
@@ -316,8 +327,8 @@
         </property>
       </activation>
       <properties>
-        <quantafs.classes.dir>${project.build.directory}/ide/classes</quantafs.classes.dir>
-        <quantafs.test-classes.dir>${project.build.directory}/ide/test-classes</quantafs.test-classes.dir>
+        <quantafs.classes.dir>${project.basedir}/.ide-build/classes</quantafs.classes.dir>
+        <quantafs.test-classes.dir>${project.basedir}/.ide-build/test-classes</quantafs.test-classes.dir>
       </properties>
     </profile>
   </profiles>

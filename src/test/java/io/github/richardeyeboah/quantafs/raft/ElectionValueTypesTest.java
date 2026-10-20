@@ -45,8 +45,8 @@ class ElectionValueTypesTest {
     void messagesRejectImpossibleTermsAndSelfAddressing() {
         NodeId a = NodeId.of("a");
         NodeId b = NodeId.of("b");
-        assertThrows(IllegalArgumentException.class, () -> new AppendEntriesRequest(a, b, 0));
-        assertThrows(IllegalArgumentException.class, () -> new AppendEntriesRequest(a, a, 1));
+        assertThrows(IllegalArgumentException.class, () -> new AppendEntriesRequest(a, b, 0, 0, 0, List.of(), 0));
+        assertThrows(IllegalArgumentException.class, () -> new AppendEntriesRequest(a, a, 1, 0, 0, List.of(), 0));
         assertThrows(IllegalArgumentException.class, () -> new RequestVoteRequest(a, b, 2, new LogPosition(3, 1)));
     }
 

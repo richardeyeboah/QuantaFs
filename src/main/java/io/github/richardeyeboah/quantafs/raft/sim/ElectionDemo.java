@@ -20,9 +20,10 @@ public final class ElectionDemo {
             """
             Usage: election-demo [--seed <n>] [--voters <3|5>]
 
-            Runs a deterministic in-process simulation of the Raft leader-election core
+            Runs a deterministic in-process simulation focused on Raft leader election
             (milestone 2A): elect a leader, crash it, elect a new one, restart the old one.
-            No client data is stored or replicated. Same seed => same output.
+            Nodes use in-memory storage and no client commands are proposed; see
+            replication-demo for replication on real per-node storage. Same seed => same output.
 
               --seed     simulation seed (default 7)
               --voters   cluster size, 3 or 5 (default 5)
@@ -60,8 +61,13 @@ public final class ElectionDemo {
         String[] ids = IntStream.rangeClosed(1, voters).mapToObj(i -> "n" + i).toArray(String[]::new);
         ElectionTiming timing = ElectionTiming.DEFAULT;
         NetworkConfig network = NetworkConfig.RELIABLE;
-        Simulation sim =
-                Simulation.builder(ids).seed(seed).timing(timing).network(network).listener(out::println).build();
+        Simulation sim = Simulation.builder(ids).seed(seed).timing(timing).network(network)
+                .listener(event -> {
+                    if (event.kind() == Simulation.EventKind.ELECTION || event.kind() == Simulation.EventKind.FAULT) {
+                        out.println(event);
+                    }
+                })
+                .build();
 
         out.println("QuantaFs Raft leader-election simulation (milestone 2A)");
         out.printf(
@@ -70,7 +76,7 @@ public final class ElectionDemo {
                 seed, List.of(ids), sim.cluster().quorum(), timing.electionTimeoutMinTicks(),
                 timing.electionTimeoutMaxTicks() - 1, timing.heartbeatIntervalTicks(),
                 network.minDelayTicks(), network.maxDelayTicks());
-        out.println("Simulation of the election core only: no client data, no log replication.");
+        out.println("Election view only: in-memory storage, no client commands (see replication-demo for those).");
 
         out.println();
         out.println("== Phase 1: initial election ==");
@@ -86,7 +92,7 @@ public final class ElectionDemo {
         long heartbeatsFrom = sim.now() + 1;
         sim.run(STABLE_TICKS);
         out.printf(
-                "[tick %4d] %s is still leader of term %d; sent %d heartbeats (AppendEntries with no entries)"
+                "[tick %4d] %s is still leader of term %d; sent %d AppendEntries heartbeats"
                         + " to %d followers; no new elections%n",
                 sim.now(), firstLeader, sim.liveNode(firstLeader).currentTerm(),
                 sim.messagesSent(firstLeader, AppendEntriesRequest.class, heartbeatsFrom), voters - 1);

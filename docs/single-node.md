@@ -209,23 +209,27 @@ Counts vary per run.
 
 ## Where Raft will fit
 
-Milestone 2A added a deterministic leader-election core in its own package
-([docs/raft-election.md](raft-election.md)). It is not connected to this server, which still
-serves every request as a single node. Wiring Raft into the request path below is planned, not
-implemented. The current boundaries are chosen so the change is additive:
+Milestone 2 added a deterministic Raft core in its own package: leader election
+([docs/raft-election.md](raft-election.md)) and log replication with ordered application to a
+separate RocksDB state machine ([docs/raft-replication.md](raft-replication.md)). It runs only in
+the in-process simulator. It is not connected to this server, which still serves every request as
+a single node. Wiring Raft into the request path below is planned, not implemented. The current
+boundaries are chosen so the change is additive:
 
 ```text
 today:   handler -> validate -> KeyValueStore.put -> respond
-planned: handler -> validate -> append command to Raft log -> wait for commit
-                 -> state machine applies committed commands in log order -> KeyValueStore.put
-                 -> respond
+planned: handler -> validate -> RaftNode.propose -> wait for COMMITTED
+                 (the leader has applied it to its RocksDbStateMachine, in log order) -> respond
 ```
 
-- `KeyValueStore` would become the storage the state machine writes to, applied strictly in log
-  order. It already has no knowledge of gRPC.
-- Validation stays in front of the log, so every committed command is guaranteed to apply.
+- The plan originally had the state machine write through this server's `KeyValueStore`. In 2B it
+  became a separate `RocksDbStateMachine`. Applying an entry must update the data and the
+  `lastApplied` marker in one atomic write, and `KeyValueStore` has no such operation.
+- Validation stays in front of the log (`Command` enforces the same key and value limits as
+  `RequestValidator`), so every committed command is guaranteed to apply.
 - The acknowledgement point moves from "synced to local WAL" to "committed by a majority and
-  applied". The durability of the Raft log itself will need its own documented sync policy.
+  applied". The Raft log's sync policy is documented in
+  [raft-replication.md](raft-replication.md#durable-storage).
 - Reads will need a leader check (for example, a read index) before they can be called linearizable.
 
 ## Glossary

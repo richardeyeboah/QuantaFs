@@ -12,16 +12,34 @@ in memory; nothing here is a working distributed database.
 Reference: Diego Ongaro and John Ousterhout, *In Search of an Understandable Consensus Algorithm*
 (2014), the [Raft paper](https://raft.github.io/raft.pdf). Rule names below follow its Figure 2.
 
+> **Updated after milestone 2B** ([raft-replication.md](raft-replication.md)). The election rules
+> and their tests below are unchanged. What changed when log replication arrived:
+>
+> - **Storage.** The 2A election-only stores (`ElectionStateStore`, `FileElectionStateStore`,
+>   `InMemoryElectionStateStore`) and the `LogMetadata` fixture interface were removed. They were
+>   replaced by `RaftStorage`, which saves `currentTerm`, `votedFor`, and the log together in one
+>   atomic write. Keeping term/vote in a separate file from the log would allow the two to
+>   disagree after a crash. The durable implementation is `RocksDbRaftStorage`. The fail-closed
+>   behavior described below carries over, and its tests moved to `RaftStorageContractTest` and
+>   `RocksDbRaftStorageTest`.
+> - **Heartbeats** are now full `AppendEntries` messages (`prevLogIndex`, `prevLogTerm`, entries,
+>   `leaderCommit`) that obey the log-matching check. A new leader also appends a `NO_OP` entry.
+> - **Vote freshness** compares against the node's real durable log, not fixture metadata.
+> - **Correction:** the election demo always used in-memory storage. Earlier output and wording said
+>   a crashed node's "durable store survives", which wrongly suggested files on disk. The demo now
+>   says the storage is in memory, standing in for a disk. `replication-demo` uses real per-node
+>   RocksDB files.
+
 ## Implemented vs. deferred
 
-| Implemented in 2A | Deferred |
+| Implemented in 2A | Deferred (at the time of 2A) |
 | --- | --- |
-| Follower / candidate / leader roles, monotonically increasing terms | Log entries, `AppendEntries` consistency check, commit index |
-| Randomized election timeouts, candidate retries after split votes | Applying committed commands to RocksDB (state machine) |
+| Follower / candidate / leader roles, monotonically increasing terms | Log entries, `AppendEntries` consistency check, commit index (**done in 2B**) |
+| Randomized election timeouts, candidate retries after split votes | Applying committed commands to RocksDB (**done in 2B**, simulated cluster only) |
 | `RequestVote` with majority voting (including the candidate's own vote) | Networked transport between processes (gRPC) |
-| Heartbeats as `AppendEntries` with no entries | Routing client writes through Raft |
+| Heartbeats as `AppendEntries` with no entries (2B: full AppendEntries) | Routing client writes through Raft |
 | Durable `currentTerm` + `votedFor`, written atomically before dependent messages | Snapshots, log compaction |
-| Election restriction (last-log term/index comparison) against a log-metadata interface | A real log behind that interface |
+| Election restriction (last-log term/index comparison) against a log-metadata interface | A real log behind that interface (**done in 2B**) |
 | Sender membership validation, stale/duplicate message handling | PreVote, check-quorum / leader leases, leadership transfer |
 | Fail-closed halt on persistence failure | Membership changes |
 | Deterministic simulator: delay, reorder, duplicate, drop, partition, crash, restart | Multi-process fault injection, power-loss testing |
@@ -56,21 +74,24 @@ Reference: Diego Ongaro and John Ousterhout, *In Search of an Understandable Con
    receive(RaftMessage) -------------->   |     RaftNode      |
                                           |  (pure decisions) |
                                           +---------+---------+
-                                                    | save(term, votedFor) BEFORE returning
-                                                    v           any message that depends on it
-                                          ElectionStateStore  (FileElectionStateStore | InMemory...)
+                                                    | save(term, votedFor, log changes) BEFORE
+                                                    v      returning any message that depends on it
+                                          RaftStorage  (RocksDbRaftStorage | InMemoryRaftStorage)
       RandomSource (seeded)  --> election timeouts
-      LogMetadata (fixture)  --> last log (term, index) for the election restriction
+      the durable log        --> last log (term, index) for the election restriction
 ```
+
+The diagram shows the current (2B) classes. In 2A the store held only term and vote, and the last
+log position came from a fixture interface.
 
 | Package / class | Responsibility |
 | --- | --- |
-| `raft.RaftNode` | All election rules. Inputs: `tick()`, `receive(message)`. Output: messages to send. No threads, clocks, I/O, gRPC, or RocksDB. |
+| `raft.RaftNode` | All election rules (and, since 2B, replication). Inputs: `tick()`, `receive(message)`. Output: messages to send. No threads, clocks, network I/O, or gRPC; storage goes through the injected interfaces. |
 | `raft.RequestVote*`, `raft.AppendEntries*` | Immutable message records, validated on construction (term >= 1, not self-addressed). `RaftMessage` is a sealed interface, so the compiler checks every message type is handled. |
-| `raft.ElectionStateStore` | Contract for durable `TermAndVote`. |
-| `raft.FileElectionStateStore` | Durable implementation (one small checksummed file). |
-| `raft.InMemoryElectionStateStore` | Test/simulation store with failure injection and a write history. |
-| `raft.LogMetadata`, `raft.LogPosition` | The narrow boundary to the future log: last entry's term and index. |
+| `raft.RaftStorage` | Contract for durable term, vote, and log, changed by atomic `StorageWrite`s (2B; replaced 2A's `ElectionStateStore`). |
+| `raft.InMemoryRaftStorage` | Test/simulation storage with failure injection and a term/vote history. |
+| `raft.storage.RocksDbRaftStorage` | Durable implementation in a dedicated RocksDB database. |
+| `raft.LogPosition` | Last entry's term and index, and the up-to-date comparison. |
 | `raft.RandomSource`, `raft.SeededRandomSource` | Injected randomness; same seed, same timeouts. |
 | `raft.sim.Simulation` | Deterministic cluster simulator and invariant checker. |
 | `raft.sim.ElectionSafety` | Checks "at most one leader per term" over a recorded history. |
@@ -99,7 +120,7 @@ received messages to `receive()`, and send what comes back.
 | Candidates: AppendEntries from new leader | Same-term heartbeat turns a candidate into a follower | `candidateBecomesFollowerOnHeartbeatFromSameTermLeader` |
 | Leaders: heartbeats | Immediately on election, then every `heartbeatIntervalTicks` | `leaderSendsHeartbeatsEveryIntervalAndNeverTimesOut`, `majorityIncludesTheCandidatesOwnVote` |
 | Legitimate timer resets | Only a current-term heartbeat or a granted vote restarts a follower's timer | `heartbeatsFromTheCurrentLeaderPreventElections`, `grantingAVoteResetsTheTimerButRefusingDoesNot` |
-| Persistent state | `currentTerm` and `votedFor` durable before replying; restart cannot double vote | `restartReloadsTheVoteAndRefusesASecondCandidateInTheSameTerm`, `FileElectionStateStoreTest.raftNodeRestartedOnTheSameDirectoryDoesNotVoteTwice`; simulation `nodeCrashedRightAfterVotingReloadsThatVote` |
+| Persistent state | `currentTerm` and `votedFor` durable before replying; restart cannot double vote | `restartReloadsTheVoteAndRefusesASecondCandidateInTheSameTerm`; `RocksDbRaftStorageContractTest.rejectsLoweringTheTermOrChangingAVote` and `termVoteAndEntriesSurviveReopenTogether` (real reopen); simulation `nodeCrashedRightAfterVotingReloadsThatVote` |
 | Membership (QuantaFs rule) | Messages from non-members or addressed to another node are dropped before they can affect any state | `messagesFromNonMembersOrForOtherNodesCannotAffectState` |
 | Election Safety (Figure 3) | At most one leader per term | Every simulation run (checked after every node step), `ElectionChaosTest` (120 seeded fault histories), `ElectionSafetyTest` (the checker detects violations) |
 
@@ -110,39 +131,35 @@ self), when granting a vote, and when adopting a higher term seen in any request
 In every case the write completes **before** the node returns any message that depends on it. A
 `RequestVoteResponse` granting a vote cannot exist unless that vote is durable.
 
-**How (`FileElectionStateStore`):**
+**How:**
+- **In 2A**, a small checksummed file was written using write-temp, fsync, atomic rename, and
+  directory fsync.
+- **Since 2B**, term and vote are part of `RaftStorage`, together with the log. They are written
+  in the same atomic, synced RocksDB `WriteBatch` as any log change made by the same step. The
+  2A file store was removed. The layout, sync policy, and recovery checks are described in
+  [raft-replication.md](raft-replication.md#durable-storage).
 
-1. Encode `(magic, format version, term, votedFor)` followed by a CRC32 checksum.
-2. Write it to `election-state.tmp` and `fsync` that file.
-3. Atomically rename it over `election-state` (`ATOMIC_MOVE`). A crash leaves the old or the new
-   file, never a mix.
-4. `fsync` the directory, so the rename itself survives a crash.
+**Fail closed** (unchanged since 2A):
 
-Term and vote live in one file, so they change together in one atomic step. A leftover temp file
-at startup is an interrupted write and is discarded.
-
-**Fail closed:**
-
-- A corrupt or truncated state file stops startup with an error. It is never treated as
+- Corrupt or inconsistent stored state stops startup with an error. It is never treated as
   "term 0, no vote", because forgetting a vote could let the node vote twice in one term.
-- If a save fails, the node **halts**. It returns no message for that input and ignores all later
+- If a write fails, the node **halts**. It returns no message for that input and ignores all later
   input. A halted leader stops sending heartbeats.
-- The failed store instance also refuses further use, because its view of the disk is no longer
-  trustworthy. Recovery is a restart, which re-reads whatever actually reached the disk.
-- Both stores also refuse transitions Raft never makes: a lower term, or a different vote within the
+- A storage instance whose write failed refuses further use, because its view of the disk is no
+  longer trustworthy. Recovery is a restart, which re-reads whatever actually reached the disk.
+- Storage also refuses transitions Raft never makes: a lower term, or a different vote within the
   same term. That's a second line of defense behind the node's own logic.
 
 **Assumptions and limits:**
 
 - Durability assumes the OS and device honor `fsync`. As in milestone 1, macOS `fsync` does not
   flush the drive's own cache, and power loss is not tested.
-- The store keeps one directory per node and takes no OS lock on it. Running two processes on one
-  directory is unsupported. A future server process should hold a lock, as RocksDB does in milestone 1.
-- The election state is deliberately separate from the RocksDB application data.
+- Since 2B a node directory is guarded by an OS lock (`NodeStorage`). In 2A it was not.
+- The Raft state is deliberately separate from the key-value application data.
 
-**`InMemoryElectionStateStore`** implements the same contract (verified by the shared
-`ElectionStateStoreContractTest`). In the simulator, a crashed node's store object survives the
-crash, which models its disk. The store can also be told to fail every save.
+**`InMemoryRaftStorage`** implements the same contract (verified by the shared
+`RaftStorageContractTest`). It writes nothing to disk. In the simulator, a crashed node's storage
+object is kept, standing in for a disk that survives the crash. It can also be told to fail writes.
 
 ## Timer semantics in detail
 
@@ -157,12 +174,14 @@ crash, which models its disk. The store can also be told to fail every save.
 
 ## The log-metadata boundary
 
-Voting needs only the last log entry's term and index, so the core depends on
-`LogMetadata.lastEntry()` and nothing else. In 2A, callers supply fixed values: empty logs by
-default, and chosen fixtures in tests (for example, a node whose log is behind cannot win).
-`LogPosition` rejects impossible positions, and `RaftNode` refuses to start if the last log term
-exceeds the persisted term. In 2B, a durable log will implement this interface. The comparison
-code and its tests stay as they are.
+Voting needs only the last log entry's term and index.
+- **In 2A**, the core read these from a small `LogMetadata` interface, and tests supplied fixed
+  values (for example, a node whose log is behind cannot win).
+- **Since 2B**, they come from the node's real durable log (`RaftStorage.lastPosition()`), and
+  the interface was removed. The comparison code (`LogPosition.isAtLeastAsUpToDateAs`) and its
+  tests stayed the same. The fixtures became real pre-populated logs.
+
+Storage refuses to hold an entry from a term later than the stored term.
 
 ## The simulator
 
@@ -257,7 +276,7 @@ Expected output for the default run (identical on every run):
 ```text
 QuantaFs Raft leader-election simulation (milestone 2A)
 seed 7 | voters [n1, n2, n3, n4, n5] | quorum 3 | election timeout 10-19 ticks | heartbeat every 3 ticks | network delay 1-3 ticks
-Simulation of the election core only: no client data, no log replication.
+Election view only: in-memory storage, no client commands (see replication-demo for those).
 
 == Phase 1: initial election ==
 [tick   13] n4 FOLLOWER -> CANDIDATE  term 1  (election timeout after 13 ticks; votes for itself)
@@ -277,10 +296,10 @@ Simulation of the election core only: no client data, no log replication.
 == Phase 2: 30 ticks of steady heartbeats ==
 [tick   18] n1 follows leader n4 in term 1
 [tick   19] n2 follows leader n4 in term 1
-[tick   47] n4 is still leader of term 1; sent 40 heartbeats (AppendEntries with no entries) to 4 followers; no new elections
+[tick   47] n4 is still leader of term 1; sent 40 AppendEntries heartbeats to 4 followers; no new elections
 
 == Phase 3: crash the leader ==
-[tick   47] CRASH n4 (was LEADER in term 1); its volatile state is gone, its durable store survives
+[tick   47] CRASH n4 (was LEADER in term 1): volatile state discarded; its storage is kept (in memory here, standing in for a disk)
 [tick   56] n5 FOLLOWER -> CANDIDATE  term 2  (election timeout after 11 ticks; votes for itself)
 [tick   57] n3 term 1 -> 2  (higher term from n5)
 [tick   57] n3 votes for n5 in term 2
@@ -294,7 +313,7 @@ Simulation of the election core only: no client data, no log replication.
 [tick   62] => n5 leads term 2, acknowledged by a quorum
 
 == Phase 4: restart the old leader ==
-[tick   62] RESTART n4: reloaded term 1, votedFor n4 from its durable store; starts as FOLLOWER
+[tick   62] RESTART n4: reloaded term 1, votedFor n4, log ends at index 1, lastApplied 1 from its storage; commitIndex restarts at lastApplied; starts as FOLLOWER
 [tick   63] n3 follows leader n5 in term 2
 [tick   64] n4 term 1 -> 2  (higher term from n5)
 [tick   64] n4 follows leader n5 in term 2
@@ -316,30 +335,20 @@ How to read it:
   when its third vote arrives (`n3`, `n5`, and itself), which is a majority of 5. `n1` and `n2` also voted for
   it, but their votes arrived after it had already won.
 - **Phase 2:** 30 ticks at one heartbeat round every 3 ticks gives 10 rounds to 4 followers, so 40
-  heartbeats. No follower times out.
+  heartbeats. No follower times out. (Since 2B the leader's first AppendEntries also carried its
+  `NO_OP` entry at index 1; this demo prints election events only.)
 - **Phase 3:** after the crash, `n5` and then `n1` both become candidates for term 2. `n1` loses,
   because `n2` and `n3` had already voted for `n5`, and `n1`'s request to `n5` was refused. When
   `n5`'s heartbeat arrives, `n1` steps down.
-- **Phase 4:** `n4` restarts with the term and vote it had saved (term 1, voted for itself). It learns
-  term 2 from `n5`'s heartbeat and follows. In the final table its `votedFor` is `-` because it has
-  not voted in term 2.
+- **Phase 4:** `n4` restarts with the term and vote it had kept in its in-memory storage (term 1,
+  voted for itself). Its log holds only its own `NO_OP`. It learns term 2 from `n5`'s heartbeat and
+  follows. In the final table its `votedFor` is `-` because it has not voted in term 2.
 
-## Next: milestone 2B (log replication and ordered application)
+## Next: milestone 2B
 
-Planned, not implemented:
-
-- **Durable Raft log.** Append-only entries `(index, term, command)` with the same documented
-  sync-before-acknowledge discipline as the election state, and a recovery contract. It will
-  implement `LogMetadata`, replacing the fixtures.
-- **Full AppendEntries.** Add `prevLogIndex`, `prevLogTerm`, `entries[]`, and `leaderCommit`.
-  Followers reject entries that don't match their log at `prevLogIndex` and truncate conflicting
-  suffixes. The leader tracks `nextIndex` and `matchIndex` per follower and backs off on rejection.
-- **Commitment.** The leader marks an entry committed once a majority stores it, but only for
-  entries from its own current term (section 5.4.2). Followers learn the commit index from
-  `leaderCommit`.
-- **Ordered state-machine application.** Committed entries are applied to the milestone-1
-  `KeyValueStore` strictly in log order, exactly once per node, tracking `lastApplied` durably.
-- **Testing.** The same deterministic simulator, extended with Log Matching, Leader Completeness,
-  and State Machine Safety checks over generated histories.
-- **Still later:** gRPC transport between processes, routing client writes through the leader,
-  linearizable reads, client request deduplication, snapshots, and Kubernetes deployment.
+Implemented after this milestone. See [raft-replication.md](raft-replication.md): durable log
+replication, current-term commitment with a leader `NO_OP`, ordered application to a RocksDB state
+machine, and the `replication-demo` command. In the plan written here, the state machine was to be
+the milestone-1 `KeyValueStore`. It became a separate `RocksDbStateMachine`, because the applied
+data and its `lastApplied` marker must be updated in one atomic write, which `KeyValueStore`
+cannot do.

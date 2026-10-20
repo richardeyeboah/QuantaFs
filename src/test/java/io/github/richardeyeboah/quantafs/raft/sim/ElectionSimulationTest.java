@@ -1,11 +1,11 @@
 package io.github.richardeyeboah.quantafs.raft.sim;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.richardeyeboah.quantafs.raft.LogPosition;
+import io.github.richardeyeboah.quantafs.raft.FailureMode;
+import io.github.richardeyeboah.quantafs.raft.InMemoryRaftStorage;
 import io.github.richardeyeboah.quantafs.raft.NodeId;
 import io.github.richardeyeboah.quantafs.raft.RaftMessage;
 import io.github.richardeyeboah.quantafs.raft.RaftNode;
@@ -197,12 +197,9 @@ class ElectionSimulationTest {
         // n3's fixture log is behind; it times out first but n1 and n2 refuse it (section 5.4.1).
         Simulation sim = Simulation.builder("n1", "n2", "n3")
                 .seed(seed)
-                .initialState("n1", TermAndVote.of(2, null))
-                .initialState("n2", TermAndVote.of(2, null))
-                .initialState("n3", TermAndVote.of(2, null))
-                .logPosition("n1", new LogPosition(2, 5))
-                .logPosition("n2", new LogPosition(2, 5))
-                .logPosition("n3", new LogPosition(1, 1))
+                .initialState("n1", TermAndVote.of(2, null), InMemoryRaftStorage.noOpLog(1, 1, 2, 2, 2))
+                .initialState("n2", TermAndVote.of(2, null), InMemoryRaftStorage.noOpLog(1, 1, 2, 2, 2))
+                .initialState("n3", TermAndVote.of(2, null), InMemoryRaftStorage.noOpLog(1))
                 .randomSource("n3", new ScriptedRandomSource(List.of(10), seed))
                 .randomSource("n1", new ScriptedRandomSource(List.of(19), seed + 1))
                 .randomSource("n2", new ScriptedRandomSource(List.of(17), seed + 2))
@@ -233,7 +230,7 @@ class ElectionSimulationTest {
         Simulation sim = simulation(3, 12).build();
         RaftNode leader = awaitLeader(sim);
         String broken = sim.liveNodes().stream().filter(n -> n != leader).findFirst().orElseThrow().id().value();
-        sim.store(broken).failSaves(true);
+        sim.injectStorageFailure(broken, FailureMode.FAIL_BEFORE);
         sim.crash(leader.id().value());
 
         assertTrue(sim.runUntil(s -> s.liveNode(broken).isHalted(), ELECTION_BUDGET));
@@ -246,7 +243,7 @@ class ElectionSimulationTest {
         assertEquals(List.of(), afterHalt, "a node that cannot persist sends nothing at all");
         assertTrue(sim.leaders().isEmpty(), "one healthy node out of three is not a quorum");
 
-        sim.store(broken).failSaves(false);
+        sim.injectStorageFailure(broken, FailureMode.NONE);
         sim.crash(broken);
         sim.restart(broken);
         assertTrue(sim.runUntil(s -> s.establishedLeader().isPresent(), ELECTION_BUDGET));

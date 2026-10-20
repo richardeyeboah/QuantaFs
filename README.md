@@ -4,25 +4,29 @@
 
 QuantaFs is a distributed key-value storage engine being built in Java with Raft consensus, gRPC, and RocksDB. The goal is to keep acknowledged writes durable and the cluster consistent through server crashes and network partitions.
 
-**Status: milestone 1, a durable single-node key-value service, is implemented and tested. Milestone 2A, a deterministic Raft leader-election core, is implemented and tested in simulation only; it is not connected to the server. Log replication and every distributed guarantee below are not implemented yet.**
+**Status: milestone 1, a durable single-node key-value service, is implemented and tested. Milestone 2 (2A leader election and 2B log replication, commitment, and ordered application) is implemented as a deterministic Raft core and tested with simulated nodes inside one process. The Raft nodes are not connected to the public server and do not talk over a network yet, so the distributed guarantees below are not yet delivered by a running cluster.**
 
 ## Implemented today vs. planned
 
 | Implemented | Planned (not implemented) |
 | --- | --- |
-| **M1:** gRPC + Protocol Buffers API: `Put`, `Get`, `Delete` on byte keys/values | **M2B:** durable Raft log, log replication, commitment |
-| **M1:** Explicit missing-key result (`found = false`), input validation, documented gRPC status codes | **M2B:** ordered application of committed entries to RocksDB |
-| **M1:** RocksDB storage with a configurable data directory | Raft between processes over gRPC; multi-node cluster, leader-aware routing |
-| **M1:** Writes acknowledged only after the RocksDB write-ahead log is synced to disk | Linearizable reads across replicas |
-| **M1:** Graceful shutdown, demo CLI, gRPC tests, restart and process-level SIGKILL recovery tests | Request IDs and retry deduplication |
-| **M2A:** Raft leader election: roles, terms, randomized timeouts, `RequestVote`, majority voting, heartbeats | Snapshots, lagging-node catch-up |
-| **M2A:** `currentTerm`/`votedFor` persisted atomically and durably before dependent messages; fail-closed | PreVote, leader leases / read index, membership changes |
-| **M2A:** Deterministic simulator (delay, reorder, duplicate, drop, partition, crash, restart) with election-safety checks | Docker images, Kubernetes manifests |
-| GitHub Actions workflow running all tests | Power-loss fault injection, benchmarks |
+| **M1:** gRPC + Protocol Buffers API: `Put`, `Get`, `Delete` on byte keys/values | Raft between processes over gRPC; multi-node cluster, leader-aware routing |
+| **M1:** Explicit missing-key result (`found = false`), input validation, documented gRPC status codes | Routing the public API through Raft |
+| **M1:** RocksDB storage with a configurable data directory; writes acknowledged only after the WAL is synced | Linearizable reads across replicas (read index or leases) |
+| **M1:** Graceful shutdown, demo CLI, gRPC tests, restart and process-level SIGKILL recovery tests | Request IDs and retry deduplication (exactly-once) |
+| **M2A:** Raft leader election: roles, terms, randomized timeouts, `RequestVote`, majority voting, heartbeats | Snapshots and log compaction |
+| **M2B:** Durable term-tagged log (`PUT`, `DELETE`, `NO_OP`); full `AppendEntries` with log matching, `nextIndex`/`matchIndex`, catch-up, conflict repair | PreVote, leadership transfer, membership changes |
+| **M2B:** Majority commitment restricted to current-term entries (leader `NO_OP`; Figure 8 tested) | Docker images, Kubernetes manifests |
+| **M2B:** Term, vote, and log in one atomic synced RocksDB write; OS-locked node directories; corruption refuses startup | Power-loss fault injection, benchmarks |
+| **M2B:** RocksDB state machine with atomic data + `lastApplied` marker; strict in-order apply; `commitIndex` relearned after restart | |
+| **M2B:** Internal proposal API: success only after majority commit and local apply; `UNKNOWN` if interrupted | |
+| **M2:** Deterministic simulator (delay, reorder, duplicate, drop, partition, crash, restart, injected storage/apply failures) checking election safety, log matching, committed agreement, ordered apply, and convergence | |
+| GitHub Actions workflow running all tests | |
 
 Design, exact semantics, durability policy, and test limits:
 - Milestone 1: [docs/single-node.md](docs/single-node.md)
 - Milestone 2A: [docs/raft-election.md](docs/raft-election.md)
+- Milestone 2B: [docs/raft-replication.md](docs/raft-replication.md)
 
 ## Quickstart (single node)
 
@@ -89,11 +93,21 @@ java -jar target/quantafs.jar election-demo                       # 5 voters, se
 java -jar target/quantafs.jar election-demo --voters 3 --seed 3
 ```
 
-This runs the election core inside one process with a deterministic simulated network. It prints each role change, term, and vote count as a leader is elected, crashed, and replaced, then restarts the old leader. The same seed always prints the same output. It stores no client data and is not connected to the key-value server. Expected output and a line-by-line explanation: [docs/raft-election.md](docs/raft-election.md#demonstration).
+This runs simulated nodes inside one process with a deterministic network and in-memory storage. It prints each role change, term, and vote count as a leader is elected, crashed, and replaced, then restarts the old leader. The same seed always prints the same output. It is not connected to the key-value server. Expected output and a line-by-line explanation: [docs/raft-election.md](docs/raft-election.md#demonstration).
+
+### Demonstration: Raft log replication (milestone 2B, simulation with real storage)
+
+```bash
+java -jar target/quantafs.jar replication-demo                    # 3 voters, seed 7
+java -jar target/quantafs.jar replication-demo --voters 5 --seed 2
+java -jar target/quantafs.jar replication-demo --keep             # keep the per-node RocksDB files
+```
+
+This elects a leader, replicates and applies client writes, rejects a write sent to a follower, cuts the leader off so that a write it accepts cannot commit, crashes it, elects a replacement, shows that committed data survived, and restarts the old leader from its RocksDB files so it catches up and its uncommitted entry is replaced. Each node gets its own directory under a new temporary directory, deleted afterwards unless `--keep` is given; `./data` is never touched. Nodes still run in one process with a simulated network. Expected output and a phase-by-phase explanation: [docs/raft-replication.md](docs/raft-replication.md#demonstration).
 
 ### Working in an IDE
 
-IDEs that import Maven projects through Eclipse m2e (including Cursor and VS Code with the Red Hat Java extension) compile into `target/ide/classes`, separate from Maven's `target/classes`. The `ide-separate-output` profile in `pom.xml` does this automatically. Run `./mvnw generate-sources` (or any build) once after cloning, so the generated protobuf and gRPC sources exist for the editor.
+IDEs that import Maven projects through Eclipse m2e (including Cursor and VS Code with the Red Hat Java extension) compile into `.ide-build/`, separate from Maven's `target/classes`. The `ide-separate-output` profile in `pom.xml` does this automatically. The folder is outside `target/` so that `./mvnw clean` cannot delete the IDE's incremental-build state, which made the editor report same-package types as unresolved. Run `./mvnw generate-sources` (or any build) once after cloning, so the generated protobuf and gRPC sources exist for the editor.
 
 ## The engineering problem
 
@@ -120,7 +134,7 @@ Application / test client
 - **Java:** server implementation, concurrency control, and lifecycle management.
 - **gRPC + Protocol Buffers:** typed client APIs and inter-node communication.
 - **Raft:** leader election, ordered log replication, and safe commitment.
-- **RocksDB:** persistent local key-value state; durable Raft metadata and log storage will have an explicit recovery contract.
+- **RocksDB:** persistent local key-value state, and (since 2B) a separate per-node database for durable Raft metadata and log with an explicit recovery contract.
 - **Docker + Kubernetes:** reproducible deployment with stable node identities and persistent volumes.
 
 ## Target guarantees
@@ -140,9 +154,9 @@ Scope starts with one replication group and fixed membership. Sharding, multi-ke
 
 - [x] Single-node Java service with gRPC Put, Get, and Delete.
 - [x] RocksDB persistence with restart and durability tests (process-crash level; power-loss testing is part of the fault-injection item).
-- [ ] Deterministic Raft core with election and replication tests.
+- [x] Deterministic Raft core with election and replication tests (in-process simulation; no network transport yet).
   - [x] 2A: leader election, heartbeats, and durable term/vote, with deterministic simulation tests ([docs/raft-election.md](docs/raft-election.md)).
-  - [ ] 2B: durable log replication, commitment, and ordered state-machine application.
+  - [x] 2B: durable log replication, commitment, and ordered state-machine application ([docs/raft-replication.md](docs/raft-replication.md)).
 - [ ] Three-node cluster with durable consensus state and recovery.
 - [ ] Correct reads, client retries, and request deduplication.
 - [ ] Snapshotting and lagging-node recovery.

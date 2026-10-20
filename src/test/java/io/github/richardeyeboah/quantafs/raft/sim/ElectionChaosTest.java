@@ -61,7 +61,7 @@ class ElectionChaosTest {
         assertEquals(List.of(), ElectionSafety.violations(sim.leaderHistory()));
         assertTrue(ElectionSafety.leadersByTerm(sim.leaderHistory()).size() > 1, "the history exercised several elections");
         for (String id : ids) {
-            assertDurableHistoryIsSafe(id, sim.store(id).history());
+            assertDurableHistoryIsSafe(id, sim.memoryStorage(id).termAndVoteHistory());
         }
     }
 
